@@ -33,7 +33,7 @@ If you'd rather build it from source, the steps are below.
 
 ## Made by one person
 
-Countdown is a one-person project, built and looked after by me. If something's broken or you have an idea, I'd love to hear it: [open an issue](https://github.com/arjunarunprakash/countdown-extension/issues).
+Countdown is a one-person project, built and looked after by me. If something's broken or you have an idea, I'd love to hear it: [open an issue](https://github.com/ArjunsProjects/countdown-extension/issues).
 
 ---
 

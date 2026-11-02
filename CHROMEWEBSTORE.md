@@ -40,7 +40,7 @@ YOUR PRIVACY
 Everything you add stays in Chrome on your own device. None of it is sent to me or anyone else, and there's nothing to sign up for. Countdown asks for no access to websites when you install it. If you import a calendar link, Chrome asks whether Countdown may read that one site, and that's the only site it ever contacts.
 
 FROM ME
-Countdown is a one-person project, built and looked after by me. If something's broken or you have an idea, I'd love to hear it: https://github.com/arjunarunprakash/countdown-extension/issues
+Countdown is a one-person project, built and looked after by me. If something's broken or you have an idea, I'd love to hear it: https://github.com/ArjunsProjects/countdown-extension/issues
 
 I hope it helps you as much as it helps me.
 Arjun
@@ -122,7 +122,7 @@ The items, categories and settings the user creates are stored only on their dev
 ## Privacy Policy
 
 **Privacy Policy URL**
-https://github.com/arjunarunprakash/countdown-extension/blob/main/PRIVACY.md
+https://github.com/ArjunsProjects/countdown-extension/blob/main/PRIVACY.md
 
 The source is [PRIVACY.md](PRIVACY.md). Keep it consistent with the Privacy & Data Use answers above; open the URL in a private window before submitting to confirm it loads.
 
@@ -135,8 +135,8 @@ The source is [PRIVACY.md](PRIVACY.md). Keep it consistent with the Privacy & Da
 
 **Publisher Name** — set on your Chrome Web Store developer account (one-time US$5 registration)
 **Contact Email** — mermenial@gmail.com (shown publicly; Google also sends policy notices here, so keep it monitored)
-**Support URL** — https://github.com/arjunarunprakash/countdown-extension/issues
-**Homepage URL** — https://github.com/arjunarunprakash/countdown-extension
+**Support URL** — https://github.com/ArjunsProjects/countdown-extension/issues
+**Homepage URL** — https://github.com/ArjunsProjects/countdown-extension
 
 ## Version History
 
