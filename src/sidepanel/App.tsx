@@ -23,7 +23,9 @@ import {
   selectionMode,
   type SelectionMode,
 } from "../state/selection";
+import { CalendarView } from "../components/CalendarView";
 import { CategorySection } from "../components/CategorySection";
+import { inTab, shownView } from "../state/calendar";
 import { DragGhost } from "../components/DragGhost";
 import { groupRows, nextColor } from "../lib/categories";
 import { drag } from "../state/drag";
@@ -101,10 +103,19 @@ export function App() {
   const draftCategory = draft?.categoryId && cats.some((c) => c.id === draft.categoryId) ? draft.categoryId : null;
   const draftRow = draft && <EditorRow key={draft.id} item={draft} isNew unit={unit} now={t} />;
   const draggingItem = drag.value !== null && drag.value.subject.kind !== "category";
+  // The calendar steps aside while something happens in the list (an editor,
+  // selection, naming a category) and comes back when it's done.
+  const view = shownView.value;
+  const calendar = view !== "list" && !e && !mode && editingCategory.value === null ? view : null;
 
   return (
-    <div class={`app${mode ? " app--selecting" : ""}${sheet.mounted ? " app--sheet" : ""}`}>
+    <div class={`app${mode ? " app--selecting" : ""}${sheet.mounted ? " app--sheet" : ""}${calendar ? " app--calendar" : ""}${inTab ? " app--tab" : ""}`}>
       <Header unit={unit} onNew={startNew} onNewCategory={startNewCategory} selectable={selectable} />
+      {calendar ? (
+        <main class="calendar-main">
+          <CalendarView view={calendar} now={t} />
+        </main>
+      ) : (
       <main class="list">
         {nothingUpcoming && mode !== "import" && !grouped && (
           <EmptyState variant={nothingAtAll ? "first" : "clear"} onNew={() => startNew()} onImport={() => enterSelection("import")} />
@@ -147,6 +158,7 @@ export function App() {
         <OverdueSection items={overdue} unit={unit} now={t} />
         <CompletedSection items={completed} now={t} />
       </main>
+      )}
       {sheet.mounted &&
         (lastMode.current === "import" ? (
           <ImportSheet state={sheet.state} dragging={dragging} />

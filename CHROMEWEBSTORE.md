@@ -1,6 +1,6 @@
 # Chrome Web Store Listing — Countdown
 
-> Last Updated: 2026-11-02
+> Last Updated: 2026-11-03
 
 Everything the Chrome Developer Dashboard asks for, ready to copy.
 
@@ -26,6 +26,7 @@ Countdown is made by one person, and it keeps everything on your device. There's
 WHAT IT DOES
 • Live countdowns in days, hours, minutes or seconds, for deadlines and events
 • Events with an end time and a place, which show Now while they're happening
+• A calendar: day, 3-day and month views in the side panel, and a full week in its own tab
 • Brings in your calendar: .ics files or Google, Apple and Outlook calendar links, with duplicates spotted for you
 • Colour-coded categories for each course, project or trip, with drag and drop
 • Repeating items, like weekly homework numbered Chapter 4, 5, 6 and so on
@@ -51,7 +52,7 @@ Arjun
 Productivity › Workflow & Planning
 
 **Single Purpose**
-Shows live countdowns to the user's own deadlines and event start times in Chrome's side panel.
+Shows the user's own deadlines and events as live countdowns and on a calendar, in Chrome's side panel.
 
 **Primary Language**
 English
@@ -79,7 +80,7 @@ Following the store's [listing guidance](https://developer.chrome.com/docs/webst
 4. **Bring in any calendar.** An import preview: three new events marked Import and one greyed out as Already added.
 5. **Make it yours.** Lagoon (light) with Appearance open beside Orchid (dark), and three toolbar icons sweeping from 9d to 5h.
 
-1.1.0 adds time ranges and locations, which only appear on events that have them, so these five screenshots are still accurate. A sixth showing a lecture block with **Now** would show off the new feature, but it's optional.
+1.1.0 adds time ranges and locations, which only appear on events that have them, so these five screenshots are still accurate. 1.2.0 adds the calendar, the biggest new feature since launch, so a sixth screenshot of the week view in a tab (a class timetable works well) is worth adding; it isn't made yet.
 
 The promo tile and marquee use the saturated accent gradient (not white or light grey), the logo and name, and little text, so they read at half size.
 
@@ -145,6 +146,7 @@ The source is [PRIVACY.md](PRIVACY.md). Keep it consistent with the Privacy & Da
 
 | Version | Date | Changes | Status |
 |---------|------|---------|--------|
+| 1.2.0 | 2026-11-03 | A calendar: Day, 3 days and Month views in the side panel, and Week in a full tab. Repeating events show every occurrence, categories work as show/hide calendars, and clicking an event shows its details with Complete and Edit. Keyboard shortcuts while the calendar has focus. Includes 1.1.0 | Draft |
 | 1.1.0 | 2026-11-02 | Events can have an end time and a location, set one at a time or for a whole repeating series. While an event is on, its box shows Now and it stays at the top until it ends. Imports keep calendar events' end times and locations, and exports and Google Calendar links carry them. Includes 1.0.1's changes | Draft |
 | 1.0.1 | 2026-10-26 | Fix: a repeating event imported from another time zone that matches yours today but changes its clock rules later (for example Los Angeles vs British Columbia from November 2026) now keeps its source time. Warmer summary. Listing: personal description | Draft |
 | 1.0.0 | 2026-10-24 | First release: live countdowns, repeating items, categories, import/export, seven colour themes, live toolbar icon | Published |

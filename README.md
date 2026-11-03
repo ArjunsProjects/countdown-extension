@@ -15,6 +15,7 @@ So I built a simple panel that sits beside whatever I'm working on, pulls in my 
 ## What it does
 
 - **Live countdowns** in days, hours, minutes or seconds, for deadlines (**Due**) and events (**Starts**)
+- **A calendar:** Day, 3 days and Month views in the side panel, and a full Week in its own tab, with your categories as colour-coded calendars
 - **Events with an end and a place,** like a lecture from 12:30 to 2:00 in Swing Space, which show **Now** while they're on
 - **Brings in your calendar:** `.ics` files or Google, Apple and Outlook calendar links, with duplicates spotted for you
 - **Colour-coded categories** for each course, project or trip, with drag and drop
@@ -77,6 +78,7 @@ A quick guide to everything you can do.
 | Add an item | **+** in the header. Type a title, choose **Due** or **Starts**, a date and a time. Changes save when you press Escape or Enter in the title, or click outside. |
 | Edit an item | Click its tile. **Complete** and **Remove** are at the bottom of the editor. |
 | Change the countdown unit | Click **Days** (top left) to cycle every box through Days → Hours → Minutes → Seconds. Click a single countdown box to cycle just that item; it shows a small unit label (HRS, MIN, SEC) until it cycles back to the header's unit. |
+| See your calendar | The **View** button (calendar icon) in the header switches between **List**, **Day**, **3 days** and **Month**, plus **Week** when there's room (the calendar's own tab, or a side panel dragged wider). **Open calendar in a tab** opens it full size. Click an event for its details, then **Complete** it or **Edit** it (the editor opens in the list, and the calendar comes back when you close it). The filter icon shows or hides each category on the calendar. |
 | Give an event an end and a place | For a **Starts** item, **Add end time** (or **Add end date** for an all-day event). Moving the start moves the end with it, and an end earlier than the start means the next day (9 PM – 2 AM). **Add location** sits above the notes. For a repeating stack, the stack editor sets one end time and one location for every occurrence. |
 | Repeat an item | In the editor, **Repeat**: daily, weekdays, weekly, weekly on chosen days, every 2 weeks, monthly, yearly, or **Custom dates…**. Then choose when it ends. |
 | Number repeating titles | With Repeat set, **# Number each occurrence** (select the "1" in "Chapter 1" first to replace it). |
@@ -94,7 +96,7 @@ A quick guide to everything you can do.
 
 ### Keyboard
 
-Everything works without a mouse. Tab moves between controls; Enter or Space activates. In the calendar, arrows move by day or week, Home/End to the week's ends, PageUp/PageDown by month (with Shift: by year). In the time field, arrows move through the list and Enter picks. Escape closes the innermost popover, editor or sheet, and cancels a drag. Cmd/Ctrl+Z undoes while the toast is showing. Dragging is mouse-only; the **Category** field in editors and **Move up / Move down** in a category's menu do the same jobs from the keyboard.
+Everything works without a mouse. Tab moves between controls; Enter or Space activates. In the calendar, arrows move by day or week, Home/End to the week's ends, PageUp/PageDown by month (with Shift: by year). In the time field, arrows move through the list and Enter picks. Escape closes the innermost popover, editor or sheet, and cancels a drag. Cmd/Ctrl+Z undoes while the toast is showing. While focus is in the calendar: **T** today, **J**/**N** next, **K**/**P** previous, **D** day, **X** 3 days, **W** week (when there's room), **M** month. Dragging is mouse-only; the **Category** field in editors and **Move up / Move down** in a category's menu do the same jobs from the keyboard.
 
 ## Permissions, in detail
 
@@ -128,7 +130,8 @@ src/sidepanel/     panel page, entry point and root component
 src/components/    UI components (Preact)
 src/hooks/         shared hooks: dismissal, presence animations, sheet height
 src/lib/           pure logic, unit-tested: dates, parsing, calendar, countdowns,
-                   recurrence, numbering, categories, time zones,
+                   recurrence, numbering, categories, calendar layout,
+                   time zones,
                    .ics import/export, duplicate detection, storage
                    validation, positioning, palettes, toolbar icon
 src/state/         signals and actions: items, series, categories, prefs,
@@ -149,7 +152,7 @@ tests/             Vitest unit tests
 
 ### Testing
 
-`npm test` runs 275 unit tests covering countdown math and formatting, date and time parsing, the calendar, recurrence (DST, month ends, leap years), numbering, categories (grouping, order, assignment, undo), `.ics` export and import (round trips, time zones, RRULE mapping, EXDATE and moved occurrences, RFC 5545 line rules), duplicate detection, calendar links, storage validation and backends, the store's actions and undo, multi-panel sync, selection and import. Exported rules are cross-checked by expanding them with ical.js. The suite is run in several time zones (`TZ=Europe/London npm test`, `TZ=Asia/Kolkata npm test`, …) because date bugs hide there.
+`npm test` runs 318 unit tests covering countdown math and formatting, date and time parsing, the calendar, recurrence (DST, month ends, leap years), numbering, categories (grouping, order, assignment, undo), events with an end, calendar layout (ranges, repeats beyond the stored ones, overlapping events, the all-day row), `.ics` export and import (round trips, time zones, RRULE mapping, EXDATE and moved occurrences, RFC 5545 line rules), duplicate detection, calendar links, storage validation and backends, the store's actions and undo, multi-panel sync, selection and import. Exported rules are cross-checked by expanding them with ical.js. The suite is run in several time zones (`TZ=Europe/London npm test`, `TZ=Asia/Kolkata npm test`, …) because date bugs hide there.
 
 Accessibility is checked with axe-core against every main screen in light and dark mode (WCAG 2.2 AA: 0 violations).
 
@@ -174,6 +177,12 @@ Accessibility is checked with axe-core against every main screen in light and da
   - **Completed:** newest first, each showing the exact time it was completed and its original date. **Mark as not done** moves an item back to the list and drops its completion record. **Clear** removes completed items from the list but keeps their records for stats. Both can be undone. The list shows 20 at a time.
 - **Appearance.** Mode follows the system by default; System's label says what it currently resolves to. Seven colour themes: Indigo (default), Lagoon, Fern, Orchid, Dune, Graphite and Clear. Each was measured before it went in: countdown numbers stay above 4.5:1 over the worst case of the theme's own background glows, button text passes on its gradient, and the accent stays well away from the red that means Overdue. Dune (amber) needed two adjustments for that: dark text on its buttons, and Overdue in crimson instead of red. Clear uses solid surfaces with no glass; every theme switches to solid surfaces automatically when the system's Reduce transparency setting is on.
 - **Toolbar icon.** The icon is the Sweep mark in your colour theme, drawn light or dark to match Chrome's toolbar. With **Time left on toolbar icon** on (the default), its wedge shows the share of time left until your next upcoming item, measured from when you added it (or, for a repeating item, from its previous occurrence), with a badge such as `3d`, `5h` or `45m` and a hover title like "Assignment 3 due in 2 days". It never shrinks to nothing, so "almost due" stays visible. Turn it off in Appearance if a shrinking countdown is stressful; the icon then stays still with no badge. The store and extensions-page icons are fixed Indigo images.
+- **Calendar.** Day, 3 days and Week share a time grid; Month is a month grid over the selected day's agenda.
+  - **What's on it:** everything in the range, including completed items (struck through) and past ones (muted). Repeating series show every occurrence their rule makes, not just the next 6 they keep stored, so you can browse months ahead; an occurrence you removed stays gone.
+  - **Layout:** overlapping events sit side by side and share the column's width. All-day and multi-day events run along the top. Deadlines and events without an end are drawn half an hour tall at their time, with a ring for deadlines. Today has a line at the current time. Each block's text adapts to its height: the place goes first, then the second line of the title.
+  - **Month:** coloured dots per day in the panel; titled chips where there's room (a tab or a wide panel). Picking a day lists its events below.
+  - **Where it opens:** the grid scrolls to an hour before now on today, or the morning. Each page remembers its own view, so the panel and the calendar tab can show different ones.
+  - **Editing:** Edit opens the item (or, for a later occurrence, its series) in the list and expands its category or the Overdue section if needed; the calendar comes back when the editor closes.
 - **Events with an end.** A **Starts** item can have an end and a location. It counts down to its start, then its box shows **Now** (filled with the accent, or its category's colour) and stays at the top of the list until it ends, with the time left until the end in the tooltip. After that it moves to the bottom section as **Ended**. Events without an end still move there as **Started** the moment they begin. An all-day event lasts its whole day unless it has its own end date. Deadlines are always a single moment.
 - **Categories.** With no categories the panel is one list, as before. Once you add one, the upcoming list splits into sections in your chosen order, each sorted soonest first, with uncategorised items under **Other** at the end. Overdue and Completed stay as single lists across all categories, with each row keeping its category's colour.
   - A category colours its rows' countdown boxes and adds a stripe to each tile. The eight colours are tuned so every one meets WCAG AA in both themes; there's no free colour picker because arbitrary colours can't guarantee that.

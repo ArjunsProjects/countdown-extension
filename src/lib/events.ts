@@ -74,6 +74,17 @@ export function formatClockRange(start: Date, end: Date): string {
 }
 
 /**
+ * The compact form for calendar blocks: "9:30–11 AM", "11 AM–1 PM", "3–4 PM".
+ * Whole hours drop ":00", and the meridiem is said once when it doesn't change.
+ */
+export function formatClockRangeShort(start: Date, end: Date): string {
+  const short = (d: Date) => formatClock(d).replace(":00", "");
+  const a = short(start);
+  const b = short(end);
+  return a.slice(-2) === b.slice(-2) ? `${a.slice(0, -3)}–${b}` : `${a}–${b}`;
+}
+
+/**
  * The date line for a tile:
  *   Tuesday, 10 November 2026, 9:30 – 11:00 AM
  *   Tuesday, 10 November – Thursday, 12 November 2026   (all-day, several days)

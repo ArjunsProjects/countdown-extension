@@ -1,0 +1,675 @@
+/* ── Calendar views ────────────────────────────────────────────
+   Day, 3 days and Week share a time grid; Month is the date picker's grid
+   with event marks, over the selected day's agenda. The page doesn't
+   scroll in a calendar view: the grid scrolls inside it, so the day
+   headings and the all-day row stay put. */
+
+/* Exactly the viewport, so only the grid scrolls. */
+.app--calendar {
+  height: 100vh;
+  height: 100dvh;
+}
+
+.calendar-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  padding: 0 var(--space-2) var(--space-2);
+}
+
+.app--tab .calendar-main {
+  padding-inline: var(--space-3);
+}
+
+/* The list in a wide tab keeps its panel width. */
+.app--tab:not(.app--calendar) .list {
+  width: 100%;
+  max-width: 560px;
+  margin-inline: auto;
+}
+
+.calendar-view {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-height: 0;
+  container: calendar / inline-size;
+}
+
+.calendar-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-0-5);
+}
+
+.calendar-toolbar__today {
+  height: var(--size-icon-button);
+  padding: 0 var(--space-1-5);
+}
+
+.calendar-toolbar__title {
+  flex: 1;
+  min-width: 0;
+  margin: 0 0 0 var(--space-1);
+  overflow: hidden;
+  font-size: var(--text-base);
+  line-height: var(--leading-base);
+  font-weight: var(--weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.calendar-toolbar__range-short {
+  display: none;
+}
+
+/* A 320px panel: the short range shows; the full one stays for screen readers. */
+@container calendar (max-width: 300px) {
+  .calendar-toolbar__range {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .calendar-toolbar__range-short {
+    display: inline;
+  }
+}
+
+/* Shows that some categories are hidden. */
+.calendar-toolbar__filter--active {
+  color: var(--color-accent);
+  background: var(--color-accent-subtle);
+}
+
+/* ── Time grid ─────────────────────────────────────────────── */
+.time-grid {
+  --cal-hour: 48px; /* HOUR_PX in CalendarView.tsx */
+  --gutter: 40px;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--radius-md);
+  background: var(--glass-fill);
+  backdrop-filter: var(--glass-blur);
+}
+
+.time-grid__head,
+.time-grid__allday,
+.time-grid__body {
+  display: grid;
+  grid-template-columns: var(--gutter) repeat(var(--days), minmax(0, 1fr));
+}
+
+.time-grid__head {
+  border-bottom: 1px solid var(--color-border);
+}
+
+.time-grid__day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: var(--space-0-5) 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  line-height: var(--leading-xs);
+}
+
+.time-grid__weekday {
+  font-weight: var(--weight-medium);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.time-grid__date {
+  display: grid;
+  place-items: center;
+  min-width: 28px;
+  height: 28px;
+  border-radius: var(--radius-full);
+  color: var(--color-text);
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.time-grid__day--today .time-grid__weekday {
+  color: var(--color-accent);
+}
+
+.time-grid__day--today .time-grid__date {
+  background: var(--gradient-accent);
+  color: var(--color-on-accent);
+}
+
+.time-grid__allday {
+  grid-auto-rows: 22px;
+  row-gap: 2px;
+  margin: 0;
+  padding: 2px 0;
+  border-bottom: 1px solid var(--color-border);
+  list-style: none;
+}
+
+.time-grid__allday li {
+  min-width: 0;
+  padding: 0 1px;
+}
+
+.time-grid__scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.time-grid__body {
+  position: relative;
+  height: calc(var(--cal-hour) * 24);
+}
+
+.time-grid__hours {
+  position: relative;
+}
+
+.time-grid__hour {
+  position: absolute;
+  right: var(--space-0-5);
+  translate: 0 -50%;
+  color: var(--color-text-subtle);
+  font-size: var(--text-xs);
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/* Hour lines drawn by the column itself, so there are no extra elements. */
+.time-grid__col {
+  position: relative;
+  border-left: 1px solid var(--color-border);
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0 calc(var(--cal-hour) - 1px),
+    var(--color-border) calc(var(--cal-hour) - 1px) var(--cal-hour)
+  );
+}
+
+.time-grid__events {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Each slot has a fixed size, so its event can adapt to it (below). */
+.time-grid__slot {
+  position: absolute;
+  padding: 1px 2px 1px 1px;
+  container: slot / size;
+}
+
+/* An hour or less: one line of title, then the time; the place only if there's room. */
+@container slot (max-height: 64px) {
+  .time-grid__slot .cal-event__title {
+    -webkit-line-clamp: 1;
+  }
+
+  .time-grid__slot .cal-event__place {
+    display: none;
+  }
+}
+
+/* Half an hour: the title alone (the time is in its accessible name and the details). */
+@container slot (max-height: 30px) {
+  .cal-event:not(.cal-event--moment) .cal-event__time {
+    display: none;
+  }
+}
+
+.time-grid__now {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 1;
+  height: 2px;
+  background: var(--color-accent);
+  pointer-events: none;
+}
+
+.time-grid__now::before {
+  content: "";
+  position: absolute;
+  top: -3px;
+  left: -4px;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--color-accent);
+}
+
+/* Where the grid opens (an hour before now, or the morning). It runs to the
+   end of the day, so "nearest" lines its top up with the top of the view. */
+.time-grid__start {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 1px;
+  pointer-events: none;
+  scroll-initial-target: nearest;
+}
+
+/* ── Events ────────────────────────────────────────────────── */
+/* The category colour on its own tint over glass: the pair measured for
+   countdown boxes (4.57:1 or better in every colour and theme). */
+.cal-event {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  overflow: hidden;
+  padding: 2px var(--space-0-5) 2px 6px;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(var(--cat-subtle, var(--color-accent-subtle)), var(--cat-subtle, var(--color-accent-subtle))), var(--glass-fill);
+  box-shadow: inset 3px 0 0 var(--cat, var(--color-accent));
+  color: var(--cat, var(--color-accent));
+  font-size: var(--text-xs);
+  line-height: var(--leading-xs);
+  text-align: left;
+}
+
+.cal-event:hover {
+  background: linear-gradient(var(--cat-subtle, var(--color-accent-subtle)), var(--cat-subtle, var(--color-accent-subtle))), var(--glass-fill-hover);
+}
+
+.cal-event__title {
+  display: -webkit-box;
+  max-width: 100%;
+  overflow: hidden;
+  font-weight: var(--weight-semibold);
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.cal-event__time,
+.cal-event__place,
+.cal-event__when {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A moment (a deadline, or an event without an end): one line. */
+.cal-event--moment {
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+}
+
+.cal-event--moment .cal-event__title {
+  -webkit-line-clamp: 1;
+}
+
+.cal-event--moment .cal-event__time {
+  flex: none;
+  font-weight: var(--weight-regular);
+}
+
+.cal-event--moment .cal-event__place {
+  display: none;
+}
+
+/* Deadlines carry a ring, like a task in other calendars. */
+.cal-event--due::before {
+  content: "";
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border: 1.5px solid currentColor;
+  border-radius: var(--radius-full);
+}
+
+.cal-event--now {
+  box-shadow: inset 3px 0 0 var(--cat, var(--color-accent)), inset 0 0 0 1.5px var(--cat, var(--color-accent));
+}
+
+.cal-event--past,
+.cal-event--done {
+  background: var(--glass-fill-muted);
+  box-shadow: inset 3px 0 0 var(--color-border-strong);
+  color: var(--color-text-muted);
+}
+
+.cal-event--done .cal-event__title {
+  text-decoration: line-through;
+}
+
+/* Carried over from the day before: no rounded top. */
+.cal-event--continued {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+
+.cal-event--chip {
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+}
+
+.cal-event--chip .cal-event__title {
+  -webkit-line-clamp: 1;
+}
+
+/* A day's agenda (month view): time · title, place. */
+.cal-event--row {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  column-gap: var(--space-1);
+  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-1-5);
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+}
+
+.cal-event--row::before {
+  display: none;
+}
+
+.cal-event--row .cal-event__when {
+  grid-row: 1 / span 2;
+}
+
+.cal-event--row .cal-event__title {
+  -webkit-line-clamp: 1;
+}
+
+.cal-event--row .cal-event__place {
+  grid-column: 2;
+  font-size: var(--text-xs);
+  line-height: var(--leading-xs);
+}
+
+/* ── Month ─────────────────────────────────────────────────── */
+.month-view {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-1-5);
+  min-height: 0;
+  overflow-y: auto;
+  container: month / inline-size;
+}
+
+.calendar--month td {
+  vertical-align: top;
+}
+
+.calendar--month .calendar__day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  max-width: none;
+  height: 52px;
+  aspect-ratio: auto;
+  padding-top: 6px;
+  border-radius: var(--radius-sm);
+}
+
+.month-day {
+  display: contents;
+}
+
+.month-day__dots {
+  display: flex;
+  gap: 3px;
+}
+
+.month-day__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--cat, var(--color-accent));
+}
+
+.calendar__day--selected .month-day__dot {
+  background: var(--color-on-accent);
+}
+
+.month-day__chips {
+  display: none;
+}
+
+/* Room for titles: a full tab, or a wide panel. */
+@container month (min-width: 520px) {
+  .calendar--month .calendar__day {
+    align-items: stretch;
+    height: 104px;
+    padding: 4px;
+  }
+
+  .calendar--month .calendar__num {
+    align-self: flex-start;
+    padding-left: 2px;
+  }
+
+  .month-day__dots {
+    display: none;
+  }
+
+  .month-day__chips {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .month-day__chip {
+    overflow: hidden;
+    padding: 0 4px;
+    border-radius: 4px;
+    background: linear-gradient(var(--cat-subtle, var(--color-accent-subtle)), var(--cat-subtle, var(--color-accent-subtle))), var(--glass-fill);
+    color: var(--cat, var(--color-accent));
+    font-size: var(--text-xs);
+    line-height: 16px;
+    font-weight: var(--weight-medium);
+    text-align: left;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .month-day__more {
+    padding-left: 4px;
+    color: var(--color-text-muted);
+    font-size: var(--text-xs);
+    line-height: 16px;
+    text-align: left;
+  }
+
+  .calendar__day--selected .month-day__more {
+    color: var(--color-on-accent);
+  }
+}
+
+.month-agenda__title {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+  font-weight: var(--weight-semibold);
+}
+
+.month-agenda__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-0-5);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.month-agenda__empty {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+/* ── Event details ─────────────────────────────────────────── */
+.popover--event {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-0-5);
+  width: min(300px, calc(100vw - var(--space-2) * 2));
+  padding: var(--space-1-5);
+}
+
+.event-details__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.event-details__head .icon-button {
+  margin-left: auto;
+}
+
+.event-details__category {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-0-5);
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+
+.event-details__title {
+  margin: 0;
+  font-size: var(--text-md);
+  line-height: var(--leading-md);
+  font-weight: var(--weight-semibold);
+  overflow-wrap: anywhere;
+}
+
+.event-details__when,
+.event-details__line {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+}
+
+.event-details__status {
+  margin: 0;
+  color: var(--color-accent);
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+  font-weight: var(--weight-medium);
+}
+
+.event-details__line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-0-5);
+}
+
+.event-details__line .icon {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  color: var(--color-text-subtle);
+}
+
+.event-details__notes {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+  white-space: pre-wrap;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 6;
+}
+
+.event-details__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-1);
+  margin-top: var(--space-1);
+}
+
+/* ── Category filter ───────────────────────────────────────── */
+.popover--filter {
+  min-width: 200px;
+  padding: var(--space-1-5);
+}
+
+.filter__title {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+  font-weight: var(--weight-semibold);
+}
+
+.filter__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-0-5);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.filter__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+/* ── View menu: checkable items ────────────────────────────── */
+.menu-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.menu-item--check {
+  position: relative;
+  padding-left: 32px;
+}
+
+/* The check comes from aria-checked, so state and look can't disagree. */
+.menu-item--check[aria-checked="true"]::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: var(--space-1);
+  width: 16px;
+  height: 16px;
+  translate: 0 -50%;
+  background: currentColor;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+@media (forced-colors: active) {
+  .cal-event {
+    border: 1px solid CanvasText;
+  }
+
+  .cal-event--now {
+    outline: 2px solid Highlight;
+  }
+
+  .time-grid__now,
+  .time-grid__now::before,
+  .menu-item--check[aria-checked="true"]::before {
+    forced-color-adjust: none;
+    background: CanvasText;
+  }
+}

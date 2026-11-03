@@ -1,13 +1,13 @@
 # Privacy Policy for Countdown
 
-Last updated: 2 November 2026
+Last updated: 3 November 2026
 
 Countdown is a Chrome extension that shows live countdowns to your deadlines and events in Chrome's side panel.
 
 ## What data Countdown handles
 
 - **Your items:** the titles, dates, start and end times, locations, notes, repeat rules and categories you enter, and when you completed items.
-- **Your settings:** the countdown unit, light/dark mode and colour theme you chose, whether the toolbar icon shows the time left, and which sections are collapsed.
+- **Your settings:** the countdown unit, light/dark mode and colour theme you chose, whether the toolbar icon shows the time left, which sections are collapsed, and the calendar view and categories you chose to show.
 - **Calendars you import:** events from .ics files you choose or calendar links you paste.
 
 ## How it's stored

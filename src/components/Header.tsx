@@ -6,6 +6,7 @@ import { AddMenu } from "./AddMenu";
 import { AppearanceMenu } from "./AppearanceMenu";
 import { Checkbox } from "./Checkbox";
 import { IconButton } from "./IconButton";
+import { ViewMenu } from "./ViewMenu";
 
 interface Props {
   unit: Unit;
@@ -54,6 +55,7 @@ export function Header({ unit, onNew, onNewCategory, selectable }: Props) {
           <IconButton icon="plus" label="New item" onClick={() => onNew()} disabled={selecting} />
           <AddMenu onNewItem={onNew} onNewCategory={onNewCategory} disabled={selecting} />
         </span>
+        <ViewMenu disabled={selecting} />
         <IconButton
           id="import-button"
           icon="import"

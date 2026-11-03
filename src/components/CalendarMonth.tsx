@@ -1,3 +1,4 @@
+import type { ComponentChildren } from "preact";
 import { useId, useLayoutEffect, useRef } from "preact/hooks";
 import { addDays, addMonths, formatFullDay, formatMonthYear, monthGrid, sameDay, toDateParts } from "../lib/calendar";
 import type { DateParts } from "../lib/parse";
@@ -25,6 +26,16 @@ interface Props {
   onPick: (d: DateParts, e: { shiftKey: boolean }) => void;
   /** Several days can be selected (sets aria-multiselectable). */
   multiselect?: boolean;
+  /** Without its own month header (a calendar view has its own toolbar); then labelled by `labelledBy`. */
+  hideHeader?: boolean;
+  labelledBy?: string;
+  /** Focus the active day when the grid appears (pickers do; a calendar view doesn't). */
+  autoFocus?: boolean;
+  /** Extra content inside each day's button, e.g. event dots. */
+  renderDay?: (d: DateParts) => ComponentChildren;
+  /** Each day's accessible name (default: the full date). */
+  dayLabel?: (d: DateParts) => string;
+  class?: string;
 }
 
 /**
@@ -32,11 +43,26 @@ interface Props {
  * or week, Home/End to the week's ends, PageUp/PageDown a month (Shift: a
  * year), Enter/Space picks. Shared by the single and multi date pickers.
  */
-export function CalendarMonth({ view, onViewChange, focusDay, onFocusDayChange, isSelected, isDisabled, onPick, multiselect }: Props) {
+export function CalendarMonth({
+  view,
+  onViewChange,
+  focusDay,
+  onFocusDayChange,
+  isSelected,
+  isDisabled,
+  onPick,
+  multiselect,
+  hideHeader = false,
+  labelledBy,
+  autoFocus = true,
+  renderDay,
+  dayLabel = formatFullDay,
+  class: className,
+}: Props) {
   const titleId = useId();
   const gridRef = useRef<HTMLTableElement>(null);
-  // Focus the active day when the grid first appears and after keyboard moves.
-  const moveFocus = useRef(true);
+  // Focus the active day when the grid first appears (if asked) and after keyboard moves.
+  const moveFocus = useRef(autoFocus);
   const today = toDateParts(new Date());
 
   useLayoutEffect(() => {
@@ -73,23 +99,25 @@ export function CalendarMonth({ view, onViewChange, focusDay, onFocusDayChange, 
 
   return (
     <>
-      <div class="calendar__header">
-        <button type="button" class="icon-button" aria-label="Previous month" onClick={() => onViewChange(addMonths(view, -1))}>
-          <Icon name="chevronLeft" />
-        </button>
-        <h2 id={titleId} class="calendar__title" aria-live="polite">
-          {formatMonthYear(view)}
-        </h2>
-        <button type="button" class="icon-button" aria-label="Next month" onClick={() => onViewChange(addMonths(view, 1))}>
-          <Icon name="chevronRight" />
-        </button>
-      </div>
+      {!hideHeader && (
+        <div class="calendar__header">
+          <button type="button" class="icon-button" aria-label="Previous month" onClick={() => onViewChange(addMonths(view, -1))}>
+            <Icon name="chevronLeft" />
+          </button>
+          <h2 id={titleId} class="calendar__title" aria-live="polite">
+            {formatMonthYear(view)}
+          </h2>
+          <button type="button" class="icon-button" aria-label="Next month" onClick={() => onViewChange(addMonths(view, 1))}>
+            <Icon name="chevronRight" />
+          </button>
+        </div>
+      )}
 
       <table
         ref={gridRef}
-        class="calendar"
+        class={`calendar${className ? ` ${className}` : ""}`}
         role="grid"
-        aria-labelledby={titleId}
+        aria-labelledby={hideHeader ? labelledBy : titleId}
         aria-multiselectable={multiselect || undefined}
         onKeyDown={onKey}
       >
@@ -123,7 +151,7 @@ export function CalendarMonth({ view, onViewChange, focusDay, onFocusDayChange, 
                       type="button"
                       class={classes}
                       tabIndex={sameDay(d, focusDay) ? 0 : -1}
-                      aria-label={formatFullDay(d)}
+                      aria-label={dayLabel(d)}
                       aria-current={sameDay(d, today) ? "date" : undefined}
                       aria-disabled={disabled || undefined}
                       onClick={(e) => {
@@ -131,7 +159,8 @@ export function CalendarMonth({ view, onViewChange, focusDay, onFocusDayChange, 
                         if (!disabled) onPick(d, e);
                       }}
                     >
-                      {d.day}
+                      <span class="calendar__num">{d.day}</span>
+                      {renderDay?.(d)}
                     </button>
                   </td>
                 );

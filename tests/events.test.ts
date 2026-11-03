@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { toLocalISO } from "../src/lib/dates";
-import { durationOf, endOf, formatDuration, formatWhen, phaseOf } from "../src/lib/events";
+import { durationOf, endOf, formatClockRangeShort, formatDuration, formatWhen, phaseOf } from "../src/lib/events";
 import { googleCalendarUrl } from "../src/lib/gcal";
 import { buildIcs } from "../src/lib/ics";
 import { parseIcs } from "../src/lib/ics-import";
@@ -88,6 +88,13 @@ describe("dates with an end", () => {
     expect(formatWhen(event(local(2026, 11, 10), local(2026, 11, 13), { allDay: true }))).toBe("Tuesday, 10 November – Thursday, 12 November 2026");
     expect(formatWhen(event(local(2026, 12, 30), local(2027, 1, 3), { allDay: true }))).toBe("Wednesday, 30 December 2026 – Saturday, 2 January 2027");
     expect(formatWhen(event(local(2026, 11, 11), undefined, { allDay: true }))).toBe("Wednesday, 11 November 2026");
+  });
+
+  it("shortens ranges for calendar blocks", () => {
+    const at = (h: number, m = 0) => new Date(2026, 10, 10, h, m);
+    expect(formatClockRangeShort(at(9, 30), at(11))).toBe("9:30–11\u00a0AM");
+    expect(formatClockRangeShort(at(11), at(13))).toBe("11\u00a0AM–1\u00a0PM");
+    expect(formatClockRangeShort(at(15), at(16))).toBe("3–4\u00a0PM");
   });
 
   it("formats durations", () => {

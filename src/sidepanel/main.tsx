@@ -4,6 +4,7 @@ import "@fontsource-variable/inter";
 import "../styles/tokens.css";
 import "../styles/base.css";
 import "../styles/components.css";
+import "../styles/calendar.css";
 import { now, startClock } from "../state/clock";
 import { addItem, ensureOccurrences, initStore, items, makeRepeating } from "../state/store";
 import { syncTheme } from "../state/theme";
