@@ -113,6 +113,8 @@ export function isItem(v: unknown): v is Item {
     isString(o.createdAt) &&
     isString(o.updatedAt) &&
     (o.allDay === undefined || typeof o.allDay === "boolean") &&
+    (o.endDateTime === undefined || isDateString(o.endDateTime)) &&
+    isOptionalString(o.location) &&
     isOptionalString(o.notes) &&
     isOptionalString(o.uid) &&
     isOptionalString(o.categoryId) &&
@@ -197,6 +199,8 @@ export function isSeries(v: unknown): v is Series {
     isString(t.title) &&
     (t.type === "due" || t.type === "starts") &&
     isOptionalString(t.notes) &&
+    (t.duration === undefined || isPositiveInt(t.duration)) &&
+    isOptionalString(t.location) &&
     Number.isInteger(o.nextIndex) &&
     (o.nextIndex as number) >= 0 &&
     isOptionalString(o.uid) &&

@@ -15,6 +15,7 @@ So I built a simple panel that sits beside whatever I'm working on, pulls in my 
 ## What it does
 
 - **Live countdowns** in days, hours, minutes or seconds, for deadlines (**Due**) and events (**Starts**)
+- **Events with an end and a place,** like a lecture from 12:30 to 2:00 in Swing Space, which show **Now** while they're on
 - **Brings in your calendar:** `.ics` files or Google, Apple and Outlook calendar links, with duplicates spotted for you
 - **Colour-coded categories** for each course, project or trip, with drag and drop
 - **Repeating items,** like weekly homework numbered "Chapter 4, 5, 6…"
@@ -76,6 +77,7 @@ A quick guide to everything you can do.
 | Add an item | **+** in the header. Type a title, choose **Due** or **Starts**, a date and a time. Changes save when you press Escape or Enter in the title, or click outside. |
 | Edit an item | Click its tile. **Complete** and **Remove** are at the bottom of the editor. |
 | Change the countdown unit | Click **Days** (top left) to cycle every box through Days → Hours → Minutes → Seconds. Click a single countdown box to cycle just that item; it shows a small unit label (HRS, MIN, SEC) until it cycles back to the header's unit. |
+| Give an event an end and a place | For a **Starts** item, **Add end time** (or **Add end date** for an all-day event). Moving the start moves the end with it, and an end earlier than the start means the next day (9 PM – 2 AM). **Add location** sits above the notes. For a repeating stack, the stack editor sets one end time and one location for every occurrence. |
 | Repeat an item | In the editor, **Repeat**: daily, weekdays, weekly, weekly on chosen days, every 2 weeks, monthly, yearly, or **Custom dates…**. Then choose when it ends. |
 | Number repeating titles | With Repeat set, **# Number each occurrence** (select the "1" in "Chapter 1" first to replace it). |
 | Manage a repeating stack | Click the stack to rename the series, set one **Time** for every occurrence, change its rule, or complete/remove occurrences one at a time or all at once. Each row shows the occurrence's title and date. The pencil on an occurrence edits just that one (its date, time, or its own title via **Rename: Only this one**). |
@@ -138,7 +140,7 @@ tests/             Vitest unit tests
 ### How it fits together
 
 - **UI:** Preact components with `@preact/signals` for state. Components read signals directly, so only what changed re-renders.
-- **Data model:** `Item` (title, type, `dateTime` as ISO with UTC offset, optional all-day, notes, source, `seriesId`, completion) and `Series` (rule, end, title template, numbering, next index to generate, optional source time zone). Completions are also stored as separate records so stats survive removal. `Category` (name, colour from a fixed palette, collapsed) lives in an ordered list; items and series point to one by `categoryId`, and a series passes it on to every occurrence it generates.
+- **Data model:** `Item` (title, type, `dateTime` as ISO with UTC offset, optional all-day, optional `endDateTime` and location for events, notes, source, `seriesId`, completion) and `Series` (rule, end, title template with optional duration and location, numbering, next index to generate, optional source time zone). Ends are exclusive like iCalendar's DTEND, so an all-day event ending on the 12th stores midnight starting the 13th. Completions are also stored as separate records so stats survive removal. `Category` (name, colour from a fixed palette, collapsed) lives in an ordered list; items and series point to one by `categoryId`, and a series passes it on to every occurrence it generates.
 - **Repeating items:** a series keeps its next 6 occurrences generated (deterministic ids), topping up as they are completed or pass. Rules are a subset of RRULE plus hand-picked dates.
 - **Storage:** `chrome.storage.local` with a versioned schema; everything read back is validated. Writes from one action are coalesced into a single write so other open panels never see half a change, and panels never write back in reaction to another panel's change.
 - **Themes:** `<html data-palette>` swaps a handful of `--p-*` colours in `tokens.css`; every accent-derived colour is computed from them with `color-mix()`. `src/lib/palettes.ts` holds the same colours for the toolbar icon and the swatches, and a test keeps the two identical.
@@ -161,7 +163,7 @@ Accessibility is checked with axe-core against every main screen in light and da
 ## Known limitations
 
 - Share links would need a server, so they aren't built. Keeping everything on your device matters more to me.
-- Notifications and account sync are out of scope.
+- Notifications aren't built, and neither is sync across devices yet.
 - Calendars are imported once; there is no automatic refresh of a subscribed link.
 - Exotic recurrence rules ("second Tuesday", hourly) import as a fixed stack of their next 6 occurrences.
 
@@ -172,6 +174,7 @@ Accessibility is checked with axe-core against every main screen in light and da
   - **Completed:** newest first, each showing the exact time it was completed and its original date. **Mark as not done** moves an item back to the list and drops its completion record. **Clear** removes completed items from the list but keeps their records for stats. Both can be undone. The list shows 20 at a time.
 - **Appearance.** Mode follows the system by default; System's label says what it currently resolves to. Seven colour themes: Indigo (default), Lagoon, Fern, Orchid, Dune, Graphite and Clear. Each was measured before it went in: countdown numbers stay above 4.5:1 over the worst case of the theme's own background glows, button text passes on its gradient, and the accent stays well away from the red that means Overdue. Dune (amber) needed two adjustments for that: dark text on its buttons, and Overdue in crimson instead of red. Clear uses solid surfaces with no glass; every theme switches to solid surfaces automatically when the system's Reduce transparency setting is on.
 - **Toolbar icon.** The icon is the Sweep mark in your colour theme, drawn light or dark to match Chrome's toolbar. With **Time left on toolbar icon** on (the default), its wedge shows the share of time left until your next upcoming item, measured from when you added it (or, for a repeating item, from its previous occurrence), with a badge such as `3d`, `5h` or `45m` and a hover title like "Assignment 3 due in 2 days". It never shrinks to nothing, so "almost due" stays visible. Turn it off in Appearance if a shrinking countdown is stressful; the icon then stays still with no badge. The store and extensions-page icons are fixed Indigo images.
+- **Events with an end.** A **Starts** item can have an end and a location. It counts down to its start, then its box shows **Now** (filled with the accent, or its category's colour) and stays at the top of the list until it ends, with the time left until the end in the tooltip. After that it moves to the bottom section as **Ended**. Events without an end still move there as **Started** the moment they begin. An all-day event lasts its whole day unless it has its own end date. Deadlines are always a single moment.
 - **Categories.** With no categories the panel is one list, as before. Once you add one, the upcoming list splits into sections in your chosen order, each sorted soonest first, with uncategorised items under **Other** at the end. Overdue and Completed stay as single lists across all categories, with each row keeping its category's colour.
   - A category colours its rows' countdown boxes and adds a stripe to each tile. The eight colours are tuned so every one meets WCAG AA in both themes; there's no free colour picker because arbitrary colours can't guarantee that.
   - Moving a stack moves the whole series, including occurrences generated later. A category belongs to the whole series, so changing it from any occurrence (its editor, dragging it, or Move to category) moves them all. Overdue occurrences are the exception: they move on their own.
@@ -211,6 +214,7 @@ Accessibility is checked with axe-core against every main screen in light and da
 - **Importing.** Import opens selection mode with an import sheet. Drop an `.ics` file anywhere on the panel, use **browse**, or paste a calendar link (`webcal://` or `https://`; Google's "Secret address in iCal format", Apple's public calendar link, Outlook's published `.ics`).
   - Countdown asks for permission to read a link's site only when you fetch it, covering that host and its parent domain's subdomains, since calendar servers often redirect, e.g. to `pNN-caldav.icloud.com`. Plain `http://` links are upgraded to `https://`.
   - Upcoming events appear in the list, pre-checked, with an **Import** badge. Past events are hidden and counted. **Add selected** imports them with one Undo; Cancel or Escape discards the preview.
+  - An event's end (DTEND or DURATION) and LOCATION come along, for one-off and repeating events, and an event that's already under way still imports. Exports write them back, and the Google Calendar link carries them too.
   - **Duplicates:** an event with the same title (ignoring case and spacing) and the same moment, or the same calendar UID, shows greyed out as **Already added**, unchecked. The UID check also catches re-importing a file this app exported.
   - **Times:** time zones defined in the file (Outlook) are applied exactly. Standard zone names without a definition (often Google) are converted using the browser's time-zone data. Common Windows zone names are mapped to standard ones.
   - Events become Starts items, to-dos with a due date become Due items, and Countdown's own exports restore Due vs. Starts.

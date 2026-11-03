@@ -14,11 +14,16 @@ const timePart = new Intl.DateTimeFormat("en-US", {
 });
 
 export function formatItemDate(date: Date, allDay = false): string {
+  const day = formatDay(date);
+  return allDay ? day : `${day}, ${formatClock(date)}`;
+}
+
+/** "Thursday, 29 October 2026", or without the year: "Thursday, 29 October". */
+export function formatDay(date: Date, withYear = true): string {
   const parts = Object.fromEntries(
     datePart.formatToParts(date).map((p) => [p.type, p.value]),
   ) as Record<string, string>;
-  const day = `${parts.weekday}, ${parts.day} ${parts.month} ${parts.year}`;
-  return allDay ? day : `${day}, ${formatClock(date)}`;
+  return `${parts.weekday}, ${parts.day} ${parts.month}${withYear ? ` ${parts.year}` : ""}`;
 }
 
 /** "3:00 PM" with a no-break space, so line wrapping never strands "PM". */

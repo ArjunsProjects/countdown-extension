@@ -250,6 +250,16 @@
   color: var(--color-text-muted);
 }
 
+/* An event that's happening: a solid accent box saying "Now". */
+.countdown--now {
+  background: var(--gradient-accent);
+  color: var(--color-on-accent);
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+  font-weight: var(--weight-semibold);
+  letter-spacing: normal;
+}
+
 /* ── Tile ──────────────────────────────────────────────────── */
 .tile {
   position: relative;
@@ -294,6 +304,23 @@ button.tile:active {
   color: var(--color-text-muted);
   font-size: var(--text-sm);
   line-height: var(--leading-sm);
+}
+
+.tile__location {
+  display: flex;
+  align-items: center;
+  gap: var(--space-0-5);
+  min-width: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+}
+
+.tile__location .icon {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  color: var(--color-text-subtle);
 }
 
 .tile__meta {
@@ -689,7 +716,8 @@ button.tile:active {
 .editor__title::placeholder,
 .editor__notes::placeholder,
 .text-input::placeholder,
-.time-field__input::placeholder {
+.time-field__input::placeholder,
+.editor__location-input::placeholder {
   color: var(--color-text-subtle);
 }
 
@@ -697,6 +725,56 @@ button.tile:active {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-1);
+}
+
+/* Ends: a header (label, duration, remove) over the end date and time. */
+.editor__ends {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-0-5);
+}
+
+.editor__ends-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 24px;
+}
+
+.editor__label {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+}
+
+.editor__duration {
+  color: var(--color-text-subtle);
+  font-size: var(--text-xs);
+  line-height: var(--leading-xs);
+  white-space: nowrap;
+}
+
+.editor__ends-head .icon-button {
+  margin-left: auto;
+}
+
+.editor__add-end {
+  align-self: flex-start;
+  margin-left: calc(var(--space-1) * -1);
+}
+
+.editor__location .editor__location-input {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font-size: var(--text-sm);
+}
+
+.editor__location .editor__location-input:focus-visible {
+  outline: none; /* the field's own ring (:focus-within) shows focus */
 }
 
 .editor__notes {
@@ -2147,6 +2225,16 @@ button.tile:active {
   gap: 2px;
 }
 
+.stack-time__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.stack-time__dash {
+  color: var(--color-text-muted);
+}
+
 .stack-time .time-field {
   /* .time-field's flex-basis is meant for the horizontal date/time row; in
      this vertical column it would become a 112px height. */
@@ -2433,10 +2521,17 @@ button.countdown:active {
 }
 
 /* Rows in a category: colored countdown and a stripe on the tile. */
-.row--cat .countdown:not(.countdown--past):not(.countdown--done),
-.category .row .countdown:not(.countdown--past):not(.countdown--done) {
+.row--cat .countdown:not(.countdown--past):not(.countdown--done):not(.countdown--now),
+.category .row .countdown:not(.countdown--past):not(.countdown--done):not(.countdown--now) {
   background: linear-gradient(var(--cat-subtle, var(--color-accent-subtle)), var(--cat-subtle, var(--color-accent-subtle))), var(--glass-fill);
   color: var(--cat, var(--color-accent));
+}
+
+/* Happening now in a category: the category's colour, filled. Its light-mode
+   colours are dark and its dark-mode ones light, so the text flips too. */
+.row--cat .countdown--now {
+  background: var(--cat);
+  color: light-dark(#ffffff, #0d0f1a);
 }
 
 .row--cat .tile::before {
@@ -2644,7 +2739,9 @@ body.is-dragging * {
   .checkbox__input:checked + .checkbox__box,
   .checkbox__input:indeterminate + .checkbox__box,
   .option--active,
-  .countdown--done {
+  .countdown--done,
+  .countdown--now,
+  .row--cat .countdown--now {
     forced-color-adjust: none;
     background: Highlight;
     border-color: Highlight;
@@ -2659,6 +2756,12 @@ body.is-dragging * {
   .swatch[aria-checked="true"] {
     outline: 3px solid Highlight;
     outline-offset: 2px;
+  }
+
+  /* Text fields inside a field button show focus with a shadow ring, which forced colours drop. */
+  .field-button--input:focus-within {
+    outline: 2px solid Highlight;
+    outline-offset: 1px;
   }
 
   /* The colored stripe and dot are the only category cue left; keep them. */

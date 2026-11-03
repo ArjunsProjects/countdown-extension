@@ -9,6 +9,14 @@ export interface Item {
   /** ISO 8601 with UTC offset, e.g. 2026-10-29T15:00:00-07:00. For all-day items, local midnight. */
   dateTime: string;
   allDay?: boolean;
+  /**
+   * Events only: when it ends, as ISO 8601 with UTC offset. Exclusive, like
+   * iCalendar's DTEND: an all-day event ending on the 12th stores local
+   * midnight at the start of the 13th. Absent: the event is a point in time.
+   */
+  endDateTime?: string;
+  /** Where it happens, e.g. "Wesbrook Building". */
+  location?: string;
   notes?: string;
   createdAt: string;
   updatedAt: string;

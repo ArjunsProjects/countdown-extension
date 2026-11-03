@@ -1,4 +1,5 @@
 import { abbreviate, describeRemaining, unitsRemaining } from "../lib/countdown";
+import { endOf, phaseOf } from "../lib/events";
 import { cycleItemUnit, unitOverrides } from "../state/ui";
 import type { Item, Unit } from "../lib/types";
 
@@ -33,13 +34,24 @@ export function CountdownBox({ item, unit: globalUnit, now, completing = false, 
   }
 
   const target = Date.parse(item.dateTime);
-  const value = unitsRemaining(target, now, unit);
+  const phase = phaseOf(item, now);
 
+  if (phase === "now") {
+    // Happening: the box says so; the time left until it ends is in the tooltip.
+    const left = describeRemaining(endOf(item)!, now);
+    return (
+      <div class="countdown countdown--now" role="img" aria-label={`Happening now, ends in ${left}`} data-tooltip={`Ends in ${left}`} data-tooltip-align="start">
+        <span class="countdown__label">Now</span>
+      </div>
+    );
+  }
+
+  const value = unitsRemaining(target, now, unit);
   if (value === null) {
     const overdue = item.type === "due";
     return (
       <div class={`countdown countdown--past ${overdue ? "countdown--overdue" : "countdown--started"}`}>
-        <span class="countdown__label">{overdue ? "Overdue" : "Started"}</span>
+        <span class="countdown__label">{overdue ? "Overdue" : endOf(item) === null ? "Started" : "Ended"}</span>
       </div>
     );
   }

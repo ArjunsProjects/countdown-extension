@@ -9,7 +9,8 @@ import { toLocalISO } from "../lib/dates";
 import { hasNumberToken, renderTitle } from "../lib/numbering";
 import type { TimeParts } from "../lib/parse";
 import { occurrenceIndex } from "../lib/recurrence";
-import { assignCategory, changeSeriesRule, removeItems, removeSeries, saveSeries, series, setSeriesTime } from "../state/store";
+import { MAX_LOCATION } from "../lib/events";
+import { assignCategory, changeSeriesRule, removeItems, removeSeries, saveSeries, series, setSeriesEnd, setSeriesLocation, setSeriesTime } from "../state/store";
 import { completing, editing, focusTile, startCompletion } from "../state/ui";
 import { CategoryField } from "./CategoryField";
 import { Checkbox } from "./Checkbox";
@@ -65,8 +66,18 @@ export function StackEditorRow({ seriesId, items, unit, now }: Props) {
   const [categoryId, setCategoryId] = useState<string | null>(head.categoryId ?? null);
   const latestCategory = useRef(categoryId);
   latestCategory.current = categoryId;
-  const latestTime = useRef({ time, timeTouched });
-  latestTime.current = { time, timeTouched };
+  // One end time and one place for the whole stack, like the time above.
+  const endTimeOf = (i: Item): TimeParts | null => {
+    if (i.allDay || !i.endDateTime) return null;
+    const d = new Date(i.endDateTime);
+    return { hour: d.getHours(), minute: d.getMinutes() };
+  };
+  const [endTime, setEndTime] = useState<TimeParts | null>(() => endTimeOf(head));
+  const [endTouched, setEndTouched] = useState(false);
+  const [place, setPlace] = useState(head.location ?? owner?.template.location ?? "");
+  const [placeTouched, setPlaceTouched] = useState(false);
+  const latestTime = useRef({ time, timeTouched, endTime, endTouched, place, placeTouched });
+  latestTime.current = { time, timeTouched, endTime, endTouched, place, placeTouched };
   const mixedTimes = new Set(items.map((i) => JSON.stringify(timeOf(i)))).size > 1;
 
   /** An occurrence's title as it will read with the title being edited. */
@@ -114,6 +125,8 @@ export function StackEditorRow({ seriesId, items, unit, now }: Props) {
     }
     const tm = latestTime.current;
     if (tm.timeTouched) setSeriesTime(seriesId, tm.time);
+    if (tm.endTouched && tm.time) setSeriesEnd(seriesId, tm.endTime);
+    if (tm.placeTouched) setSeriesLocation(seriesId, tm.place);
     if ((head.categoryId ?? null) !== latestCategory.current) {
       assignCategory({ kind: "series", id: seriesId }, latestCategory.current, true);
     }
@@ -146,7 +159,8 @@ export function StackEditorRow({ seriesId, items, unit, now }: Props) {
           value={title}
           onInput={(e) => setTitle(e.currentTarget.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter") {
+            // The Enter that confirms Japanese, Chinese or Korean input isn't a save.
+            if (e.key === "Enter" && !e.isComposing) {
               e.preventDefault();
               close("enter");
             }
@@ -166,14 +180,32 @@ export function StackEditorRow({ seriesId, items, unit, now }: Props) {
         <TypeToggle value={type} onChange={setType} />
         <CategoryField value={categoryId} onChange={setCategoryId} />
         <div class="stack-time">
-          <TimeField
-            value={time}
-            label="Time for every occurrence"
-            onChange={(t) => {
-              setTime(t);
-              setTimeTouched(true);
-            }}
-          />
+          <div class="stack-time__row">
+            <TimeField
+              value={time}
+              label="Time for every occurrence"
+              onChange={(t) => {
+                setTime(t);
+                setTimeTouched(true);
+              }}
+            />
+            {type === "starts" && time && (
+              <>
+                <span class="stack-time__dash" aria-hidden="true">
+                  –
+                </span>
+                <TimeField
+                  value={endTime}
+                  label="End time for every occurrence"
+                  placeholder="End time"
+                  onChange={(t) => {
+                    setEndTime(t);
+                    setEndTouched(true);
+                  }}
+                />
+              </>
+            )}
+          </div>
           <p class="field-hint">
             {timeTouched
               ? "Applies to every upcoming occurrence when you close."
@@ -181,6 +213,28 @@ export function StackEditorRow({ seriesId, items, unit, now }: Props) {
                 ? "Times differ. Set one to use it for every occurrence."
                 : "Change to move every occurrence."}
           </p>
+        </div>
+        <div class="field-button field-button--input editor__location">
+          <Icon name="pin" />
+          <input
+            class="editor__location-input"
+            aria-label="Location for every occurrence"
+            placeholder="Add location"
+            maxLength={MAX_LOCATION}
+            autoComplete="off"
+            enterKeyHint="done"
+            value={place}
+            onInput={(e) => {
+              setPlace(e.currentTarget.value);
+              setPlaceTouched(true);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.isComposing) {
+                e.preventDefault();
+                close("enter");
+              }
+            }}
+          />
         </div>
         {initialRepeat !== NO_REPEAT && (
           <RepeatField date={partsOf(head.dateTime)} value={repeat} onChange={setRepeat} />

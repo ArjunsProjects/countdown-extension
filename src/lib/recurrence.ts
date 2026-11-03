@@ -1,4 +1,5 @@
 import { toLocalISO } from "./dates";
+import { endAfter } from "./events";
 import { daysInMonth } from "./parse";
 import { renderTitle } from "./numbering";
 import { instantToWallTime, zonedTimeToInstant } from "./timezone";
@@ -39,7 +40,14 @@ export interface Series {
   rule: RepeatRule;
   end: RepeatEnd;
   /** Fields copied onto newly generated occurrences. */
-  template: { title: string; type: ItemType; notes?: string };
+  template: {
+    title: string;
+    type: ItemType;
+    notes?: string;
+    /** Events: minutes from each occurrence's start to its end (whole days for all-day series). */
+    duration?: number;
+    location?: string;
+  };
   /** Index of the next occurrence to generate. */
   nextIndex: number;
   /** iCalendar UID when imported; kept for duplicate detection and export. */
@@ -287,7 +295,9 @@ export function topUp(
     }
     if (i >= next) {
       next = i + 1;
-      if (date.getTime() > now) {
+      // An occurrence that's already happening (it has an end) still counts.
+      const end = occurrenceEnd(series, date);
+      if ((end ?? date).getTime() > now) {
         const id = occurrenceId(series, i);
         if (!existing.has(id)) {
           const stamp = toLocalISO(new Date(now));
@@ -304,6 +314,8 @@ export function topUp(
           if (series.allDay) item.allDay = true;
           if (series.categoryId) item.categoryId = series.categoryId;
           if (series.template.notes) item.notes = series.template.notes;
+          if (series.template.location) item.location = series.template.location;
+          if (series.template.duration && end) item.endDateTime = toLocalISO(end);
           added.push(item);
         }
         upcoming++;
@@ -314,6 +326,16 @@ export function topUp(
   }
 
   return { series: next === series.nextIndex ? series : { ...series, nextIndex: next }, added, ended };
+}
+
+/**
+ * When an occurrence starting at `date` ends: its series' duration, or, for
+ * all-day events, the end of the day. null for deadlines and moments.
+ */
+export function occurrenceEnd(series: Series, date: Date): Date | null {
+  if (series.template.type !== "starts") return null;
+  if (series.template.duration) return endAfter(date, series.template.duration, Boolean(series.allDay));
+  return series.allDay ? endAfter(date, 1440, true) : null;
 }
 
 /** True once a series has generated its last occurrence. */

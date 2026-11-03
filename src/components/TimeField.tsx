@@ -92,6 +92,8 @@ export function TimeField({ value, onChange, label = "Time", placeholder = "All 
       }
       case "Enter":
         e.preventDefault();
+        // Confirming Japanese, Chinese or Korean input, not choosing a time.
+        if (e.isComposing) return;
         if (open && navigated) choose(TIME_OPTIONS[active]!);
         else commitText();
         return;

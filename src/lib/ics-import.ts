@@ -1,5 +1,6 @@
 import ICAL from "ical.js";
 import { toLocalISO } from "./dates";
+import { MAX_LOCATION } from "./events";
 import { occurrenceId, occurrences, wallDate, wallYmd, WINDOW, type RepeatEnd, type RepeatRule, type Series } from "./recurrence";
 import { localTimeZone, resolveTimeZone, sameZone, zonedTimeToInstant } from "./timezone";
 import type { Item, ItemType } from "./types";
@@ -15,6 +16,8 @@ import type { Item, ItemType } from "./types";
 //    that keep generating; others become a fixed stack of their next
 //    occurrences. EXDATE and moved occurrences (RECURRENCE-ID) are honoured.
 //  - VTODOs with a DUE date import as Due items.
+//  - An event's end (DTEND or DURATION) and LOCATION are kept; a single
+//    all-day day and a zero-length event need no stored end.
 
 export class ImportError extends Error {}
 
@@ -129,7 +132,15 @@ function convert(
   const title = clip(text0(comp.getFirstPropertyValue("summary")).trim(), MAX_TITLE) || "Untitled event";
   const notes = clip(text0(comp.getFirstPropertyValue("description")).trim(), MAX_NOTES) || undefined;
   const uid = text0(comp.getFirstPropertyValue("uid")) || undefined;
+  const location = clip(text0(comp.getFirstPropertyValue("location")).trim(), MAX_LOCATION) || undefined;
   const stamp = toLocalISO(new Date(now));
+
+  /** An occurrence's end, when it's worth storing (events only, after the start, not a default single day). */
+  const endField = (when: Date, end: Date | null): Partial<Item> => {
+    if (type !== "starts" || !end || end <= when) return {};
+    if (allDay && end.getTime() === new Date(when.getFullYear(), when.getMonth(), when.getDate() + 1).getTime()) return {};
+    return { endDateTime: toLocalISO(end) };
+  };
 
   const makeItem = (id: string, when: Date, extra: Partial<Item> = {}): Item => {
     const item: Item = {
@@ -144,6 +155,7 @@ function convert(
     };
     if (allDay) item.allDay = true;
     if (notes) item.notes = notes;
+    if (location && item.location === undefined) item.location = location;
     return item;
   };
   const isUpcoming = (when: Date) => (allDay ? when.getTime() >= today : when.getTime() > now);
@@ -151,8 +163,10 @@ function convert(
   const recurring = !isTodo && (comp.hasProperty("rrule") || comp.hasProperty("rdate"));
   if (!recurring) {
     const when = toLocal(startTime, tzid);
-    if (!isUpcoming(when)) return "past";
-    return { at: when.getTime(), candidate: { kind: "item", item: makeItem(newId(), when, uid ? { uid } : {}) } };
+    const end = isTodo ? null : endOfComponent(comp, when, tzid);
+    // A running event is still worth importing; one that's over isn't.
+    if (!isUpcoming(when) && !(end && end.getTime() > now && type === "starts")) return "past";
+    return { at: when.getTime(), candidate: { kind: "item", item: makeItem(newId(), when, { ...(uid ? { uid } : {}), ...endField(when, end) }) } };
   }
 
   // Expand with ical.js, which applies EXDATE, RDATE and moved occurrences.
@@ -165,6 +179,8 @@ function convert(
     }
   }
   const upcoming: Date[] = [];
+  /** Per occurrence: its own end and place (a moved or edited occurrence can differ from the series). */
+  const extras = new Map<number, Partial<Item>>();
   const iterator = event.iterator();
   let guard = 0;
   for (let next = iterator.next(); next && upcoming.length < WINDOW; next = iterator.next()) {
@@ -172,8 +188,13 @@ function convert(
     const details = event.getOccurrenceDetails(next);
     const source = details.item.component;
     if (String(source.getFirstPropertyValue("status") ?? "").toUpperCase() === "CANCELLED") continue;
-    const when = toLocal(details.startDate, (source.getFirstProperty("dtstart")?.getParameter("tzid") as string | undefined) ?? tzid);
-    if (isUpcoming(when)) upcoming.push(when);
+    const zone = (source.getFirstProperty("dtstart")?.getParameter("tzid") as string | undefined) ?? tzid;
+    const when = toLocal(details.startDate, zone);
+    const end = details.endDate ? toLocal(details.endDate, (source.getFirstProperty("dtend")?.getParameter("tzid") as string | undefined) ?? zone) : null;
+    if (!isUpcoming(when) && !(end && end.getTime() > now && type === "starts")) continue;
+    upcoming.push(when);
+    const place = clip(text0(source.getFirstPropertyValue("location")).trim(), MAX_LOCATION) || undefined;
+    extras.set(when.getTime(), { ...endField(when, end), ...(place !== location ? { location: place } : {}) });
   }
   if (upcoming.length === 0) return "past";
 
@@ -188,9 +209,13 @@ function convert(
   if (!mapped) {
     // Fixed stack: the next occurrences, without a rule to generate more.
     const seriesId = newId();
-    const items = upcoming.map((when) => makeItem(newId(), when, { seriesId }));
+    const items = upcoming.map((when) => makeItem(newId(), when, { seriesId, ...extras.get(when.getTime()) }));
     return { at: upcoming[0]!.getTime(), candidate: { kind: "series", seriesId, series: null, items, ...(uid ? { uid } : {}) } };
   }
+
+  // The series' own length, from the master event (DTEND − DTSTART, or DURATION).
+  const masterEnd = endOfComponent(comp, start, tzid);
+  const duration = type === "starts" && masterEnd ? lengthOf(start, masterEnd, allDay) : undefined;
 
   const series: Series = {
     id: newId(),
@@ -198,7 +223,7 @@ function convert(
     start: toLocalISO(start),
     rule: mapped.rule,
     end: mapped.end,
-    template: { title, type, ...(notes ? { notes } : {}) },
+    template: { title, type, ...(notes ? { notes } : {}), ...(duration ? { duration } : {}), ...(location ? { location } : {}) },
     nextIndex: 0,
     ...(uid ? { uid } : {}),
   };
@@ -219,12 +244,35 @@ function convert(
   series.nextIndex = Math.max(1, i);
   const items = upcoming.map((when) => {
     const index = indexOf.get(when.getTime());
-    return makeItem(index === undefined ? newId() : occurrenceId(series, index), when, { seriesId: series.id });
+    return makeItem(index === undefined ? newId() : occurrenceId(series, index), when, { seriesId: series.id, ...extras.get(when.getTime()) });
   });
   return { at: upcoming[0]!.getTime(), candidate: { kind: "series", seriesId: series.id, series, items, ...(uid ? { uid } : {}) } };
 }
 
 // ── Times ─────────────────────────────────────────────────────
+
+/** Where a VEVENT ends: DTEND, else DTSTART + DURATION, else null (a moment, or one all-day day). */
+function endOfComponent(comp: ICAL.Component, start: Date, tzid: string | undefined): Date | null {
+  const endProp = comp.getFirstProperty("dtend");
+  if (endProp) return toLocal(endProp.getFirstValue() as ICAL.Time, (endProp.getParameter("tzid") as string | undefined) ?? tzid);
+  const duration = comp.getFirstPropertyValue("duration") as ICAL.Duration | null;
+  if (!duration) return null;
+  // All-day lengths count days, so a day that changes the clocks still ends at midnight.
+  if ((comp.getFirstPropertyValue("dtstart") as ICAL.Time | null)?.isDate) {
+    return new Date(start.getFullYear(), start.getMonth(), start.getDate() + Math.round(duration.toSeconds() / 86_400));
+  }
+  return new Date(start.getTime() + duration.toSeconds() * 1000);
+}
+
+/** A series' duration in minutes (whole days for all-day), or undefined when it's the default. */
+function lengthOf(start: Date, end: Date, allDay: boolean): number | undefined {
+  if (end <= start) return undefined;
+  if (allDay) {
+    const days = Math.round((end.getTime() - start.getTime()) / 86_400_000);
+    return days > 1 ? days * 1440 : undefined;
+  }
+  return Math.round((end.getTime() - start.getTime()) / 60_000);
+}
 
 /** An ICAL.Time as a local Date, honouring its TZID (see module comment). */
 function toLocal(time: ICAL.Time, tzid: string | undefined): Date {

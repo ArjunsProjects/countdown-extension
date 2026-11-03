@@ -1,5 +1,6 @@
 import { batch, signal } from "@preact/signals";
 import { toLocalISO } from "../lib/dates";
+import { durationOf, MAX_LOCATION } from "../lib/events";
 import * as ops from "../lib/items";
 import { moveIndex, type Category, type CategoryColor } from "../lib/categories";
 import { hasNumberToken } from "../lib/numbering";
@@ -180,6 +181,16 @@ export function saveSeries(seriesId: string, patch: { title: string; type: Item[
 
 // ── Recurring series ──────────────────────────────────────────
 
+/** What a series copies from its first occurrence onto later ones. */
+function templateOf(item: Item, title: string): Series["template"] {
+  const t: Series["template"] = { title, type: item.type };
+  if (item.notes) t.notes = item.notes;
+  const duration = durationOf(item);
+  if (duration) t.duration = duration;
+  if (item.location) t.location = item.location;
+  return t;
+}
+
 /**
  * Turns an item into the first occurrence of a new repeating series.
  * `title` carries the template when it numbers occurrences ({n}); the item's
@@ -194,7 +205,7 @@ export function makeRepeating(item: Item, rule: RepeatRule, end: RepeatEnd, titl
     start: item.dateTime,
     rule,
     end,
-    template: { title: title?.template ?? item.title, type: item.type, ...(item.notes ? { notes: item.notes } : {}) },
+    template: templateOf(item, title?.template ?? item.title),
     nextIndex: 1,
   };
   const { numberFrom } = titleFields({ template: s.template.title, numberFrom: title?.numberFrom });
@@ -235,7 +246,7 @@ export function changeSeriesRule(
         start: anchor.dateTime,
         rule,
         end,
-        template: { title: title?.template ?? anchor.title, type: anchor.type, ...(anchor.notes ? { notes: anchor.notes } : {}) },
+        template: templateOf(anchor, title?.template ?? anchor.title),
         nextIndex: 1,
       };
       const { numberFrom } = titleFields({ template: restarted.template.title, numberFrom: title?.numberFrom });
@@ -278,15 +289,82 @@ export function setSeriesTime(seriesId: string, time: TimeParts | null, now = ne
     else next.allDay = true;
     return next;
   };
+  // Occurrences keep their length when moved. Switching between all-day and
+  // timed drops the end, since its unit (days vs minutes) changes.
+  const sameKind = (allDay: boolean | undefined) => Boolean(time) === !allDay;
+  const moved = (i: Item): Item => {
+    const next = withTime({ ...i, dateTime: at(i.dateTime), updatedAt: stamp });
+    if (!i.endDateTime || !sameKind(i.allDay)) return withoutKey(next, "endDateTime");
+    const length = Date.parse(i.endDateTime) - Date.parse(i.dateTime);
+    return { ...next, endDateTime: toLocalISO(new Date(Date.parse(next.dateTime) + length)) };
+  };
+  batch(() => {
+    setItems(items.value.map((i) => (i.seriesId === seriesId && !i.completedAt && Date.parse(i.dateTime) > t ? moved(i) : i)));
+    if (s) {
+      const next = withTime({ ...s, start: at(s.start) });
+      if (!sameKind(s.allDay)) next.template = withoutKey(s.template, "duration");
+      setSeries(series.value.map((x) => (x.id === seriesId ? next : x)));
+    }
+  });
+}
+
+const withoutKey = <T extends object, K extends keyof T>(o: T, key: K): T => {
+  const next = { ...o };
+  delete next[key];
+  return next;
+};
+
+/**
+ * Gives every upcoming, uncompleted occurrence of a timed series the same
+ * end time (null = no end), and future occurrences the same length. An end
+ * at or before an occurrence's start means the next day (9 PM – 2 AM).
+ */
+export function setSeriesEnd(seriesId: string, time: TimeParts | null, now = new Date()) {
+  const s = series.value.find((x) => x.id === seriesId);
+  const t = now.getTime();
+  const stamp = toLocalISO(now);
+  const endFor = (iso: string): string | undefined => {
+    if (!time) return undefined;
+    const start = new Date(iso);
+    let end = new Date(start.getFullYear(), start.getMonth(), start.getDate(), time.hour, time.minute);
+    if (end <= start) end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 1, time.hour, time.minute);
+    return toLocalISO(end);
+  };
+  const upcoming = (i: Item) => i.seriesId === seriesId && !i.completedAt && Date.parse(i.dateTime) > t && !i.allDay;
+  batch(() => {
+    setItems(
+      items.value.map((i) => {
+        if (!upcoming(i)) return i;
+        const endDateTime = endFor(i.dateTime);
+        const next = withoutKey({ ...i, updatedAt: stamp }, "endDateTime");
+        return endDateTime ? { ...next, endDateTime } : next;
+      }),
+    );
+    if (s && !s.allDay) {
+      const end = endFor(s.start);
+      const duration = end ? Math.round((Date.parse(end) - Date.parse(s.start)) / 60_000) : undefined;
+      const template = withoutKey(s.template, "duration");
+      setSeries(series.value.map((x) => (x.id === seriesId ? { ...s, template: duration ? { ...template, duration } : template } : x)));
+    }
+  });
+}
+
+/** Gives every upcoming, uncompleted occurrence of a series, and future ones, the same location ("" = none). */
+export function setSeriesLocation(seriesId: string, location: string, now = new Date()) {
+  const s = series.value.find((x) => x.id === seriesId);
+  const t = now.getTime();
+  const stamp = toLocalISO(now);
+  const place = location.trim().slice(0, MAX_LOCATION);
+  const apply = <T extends { location?: string }>(x: T): T => (place ? { ...x, location: place } : withoutKey(x, "location"));
   batch(() => {
     setItems(
       items.value.map((i) =>
-        i.seriesId === seriesId && !i.completedAt && Date.parse(i.dateTime) > t
-          ? withTime({ ...i, dateTime: at(i.dateTime), updatedAt: stamp })
+        i.seriesId === seriesId && !i.completedAt && Date.parse(i.dateTime) > t && (i.location ?? "") !== place
+          ? { ...apply(i), updatedAt: stamp }
           : i,
       ),
     );
-    if (s) setSeries(series.value.map((x) => (x.id === seriesId ? withTime({ ...x, start: at(x.start) }) : x)));
+    if (s) setSeries(series.value.map((x) => (x.id === seriesId ? { ...s, template: apply(s.template) } : x)));
   });
 }
 

@@ -1,5 +1,6 @@
 import ICAL from "ical.js";
-import { occurrenceId, occurrenceIndex, occurrences, occurrenceTitle, wallDate, withinEnd, type RepeatEnd, type Series } from "./recurrence";
+import { endAfter, endOf } from "./events";
+import { occurrenceEnd, occurrenceId, occurrenceIndex, occurrences, occurrenceTitle, wallDate, withinEnd, type RepeatEnd, type Series } from "./recurrence";
 import { zonedTimeToInstant } from "./timezone";
 import { buildVtimezone } from "./vtimezone";
 import type { Item } from "./types";
@@ -13,8 +14,11 @@ import type { Item } from "./types";
 //    the calendar is in. A series that follows another zone (imported, e.g.
 //    9:30 IST) is written with TZID=<IANA name> plus a generated VTIMEZONE.
 //  - All-day items use VALUE=DATE.
-//  - Deadlines and start times are points in time, so events have no DTEND
-//    (RFC 5545 §3.6.1: the event ends when it starts).
+//  - Events with an end get DTEND (exclusive, so an all-day event ending on
+//    the 12th has DTEND 13th; a single all-day day needs none). Deadlines and
+//    events without an end are points in time with no DTEND (RFC 5545
+//    §3.6.1: the event ends when it starts).
+//  - LOCATION carries the event's place.
 
 export const PRODID = "-//Countdown//Countdown Chrome Extension//EN";
 
@@ -83,21 +87,25 @@ function applyEnd(data: Record<string, unknown>, end: RepeatEnd, fromIndex: numb
   }
 }
 
-function baseEvent(uid: string, title: string, type: Item["type"], notes: string | undefined, now: Date) {
+function baseEvent(uid: string, title: string, type: Item["type"], notes: string | undefined, now: Date, location?: string) {
   const ev = new ICAL.Component("vevent");
   ev.updatePropertyWithValue("uid", uid);
   ev.updatePropertyWithValue("dtstamp", utc(now));
   ev.updatePropertyWithValue("summary", title);
   if (notes) ev.updatePropertyWithValue("description", notes);
+  if (location) ev.updatePropertyWithValue("location", location);
   // Lets a round trip through the file restore Due vs Starts exactly.
   ev.updatePropertyWithValue("x-countdown-type", type);
   return ev;
 }
 
 function itemEvent(item: Item, now: Date) {
-  const ev = baseEvent(item.uid ?? `${item.id}@countdown`, item.title, item.type, item.notes, now);
+  const ev = baseEvent(item.uid ?? `${item.id}@countdown`, item.title, item.type, item.notes, now, item.location);
   const when = new Date(item.dateTime);
   ev.updatePropertyWithValue("dtstart", item.allDay ? floating(when, true) : utc(when));
+  // An all-day event without its own end is one day, which DTSTART alone says.
+  const end = item.endDateTime ? endOf(item) : null;
+  if (end !== null) ev.updatePropertyWithValue("dtend", item.allDay ? floating(new Date(end), true) : utc(new Date(end)));
   return ev;
 }
 
@@ -114,11 +122,11 @@ function inRfcSet(series: Series, date: Date): boolean {
   return true;
 }
 
-/** Sets DTSTART / adds EXDATE for a series time: floating, or TZID'd for a zoned series. */
-function seriesTime(ev: ICAL.Component, name: "dtstart" | "exdate", series: Series, date: Date, allDay: boolean) {
+/** Sets DTSTART / DTEND / adds EXDATE for a series time: floating, or TZID'd for a zoned series. */
+function seriesTime(ev: ICAL.Component, name: "dtstart" | "dtend" | "exdate", series: Series, date: Date, allDay: boolean) {
   const zone = allDay ? undefined : series.timeZone;
   const value = floating(wallDate(date, zone), allDay);
-  const prop = name === "dtstart" ? ev.updatePropertyWithValue(name, value) : ev.addPropertyWithValue(name, value);
+  const prop = name === "exdate" ? ev.addPropertyWithValue(name, value) : ev.updatePropertyWithValue(name, value);
   if (zone) prop.setParameter("tzid", zone);
 }
 
@@ -149,8 +157,13 @@ function seriesEvents(series: Series, upcoming: Item[], allItems: readonly Item[
     if (i >= fromIndex) {
       const item = byIndex.get(i);
       const generated = i < series.nextIndex;
-      // Moved, or renamed on its own: exported as its own event plus an EXDATE.
-      const moved = item !== undefined && (Date.parse(item.dateTime) !== date.getTime() || item.customTitle === true);
+      // Moved, renamed, or given its own end or place: exported as its own event plus an EXDATE.
+      const moved =
+        item !== undefined &&
+        (Date.parse(item.dateTime) !== date.getTime() ||
+          item.customTitle === true ||
+          endOf(item) !== (occurrenceEnd(series, date)?.getTime() ?? null) ||
+          (item.location ?? "") !== (series.template.location ?? ""));
       const synced = inRfcSet(series, date);
 
       if (dtIndex < 0) {
@@ -175,8 +188,10 @@ function seriesEvents(series: Series, upcoming: Item[], allItems: readonly Item[
   }
 
   if (dtIndex >= 0 && dtDate) {
-    const ev = baseEvent(series.uid ?? `${series.id}@countdown`, series.template.title, series.template.type, series.template.notes, now);
+    const { template } = series;
+    const ev = baseEvent(series.uid ?? `${series.id}@countdown`, template.title, template.type, template.notes, now, template.location);
     seriesTime(ev, "dtstart", series, dtDate, allDay);
+    if (template.type === "starts" && template.duration) seriesTime(ev, "dtend", series, endAfter(dtDate, template.duration, allDay), allDay);
     ev.updatePropertyWithValue("rrule", recurFor(series, dtIndex, allDay));
     for (const d of exdates) seriesTime(ev, "exdate", series, d, allDay);
     out.unshift(ev);
@@ -221,6 +236,10 @@ function listedEvents(series: Series, upcoming: Item[], allItems: readonly Item[
           source: "manual",
           ...(series.allDay ? { allDay: true } : {}),
           ...(series.template.notes ? { notes: series.template.notes } : {}),
+          ...(series.template.location ? { location: series.template.location } : {}),
+          ...(series.template.type === "starts" && series.template.duration
+            ? { endDateTime: endAfter(date, series.template.duration, Boolean(series.allDay)).toISOString() }
+            : {}),
         };
         out.push(occurrenceEvent(series, item, i, now));
       }

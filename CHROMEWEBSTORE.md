@@ -1,6 +1,6 @@
 # Chrome Web Store Listing — Countdown
 
-> Last Updated: 2026-10-26
+> Last Updated: 2026-11-02
 
 Everything the Chrome Developer Dashboard asks for, ready to copy.
 
@@ -25,6 +25,7 @@ Countdown is made by one person, and it keeps everything on your device. There's
 
 WHAT IT DOES
 • Live countdowns in days, hours, minutes or seconds, for deadlines and events
+• Events with an end time and a place, which show Now while they're happening
 • Brings in your calendar: .ics files or Google, Apple and Outlook calendar links, with duplicates spotted for you
 • Colour-coded categories for each course, project or trip, with drag and drop
 • Repeating items, like weekly homework numbered Chapter 4, 5, 6 and so on
@@ -77,6 +78,8 @@ Following the store's [listing guidance](https://developer.chrome.com/docs/webst
 3. **Repeats that number themselves.** A weekly "Chapter {n} Homework" series open, listing Chapter 4–9 with their dates.
 4. **Bring in any calendar.** An import preview: three new events marked Import and one greyed out as Already added.
 5. **Make it yours.** Lagoon (light) with Appearance open beside Orchid (dark), and three toolbar icons sweeping from 9d to 5h.
+
+1.1.0 adds time ranges and locations, which only appear on events that have them, so these five screenshots are still accurate. A sixth showing a lecture block with **Now** would show off the new feature, but it's optional.
 
 The promo tile and marquee use the saturated accent gradient (not white or light grey), the logo and name, and little text, so they read at half size.
 
@@ -142,6 +145,7 @@ The source is [PRIVACY.md](PRIVACY.md). Keep it consistent with the Privacy & Da
 
 | Version | Date | Changes | Status |
 |---------|------|---------|--------|
+| 1.1.0 | 2026-11-02 | Events can have an end time and a location, set one at a time or for a whole repeating series. While an event is on, its box shows Now and it stays at the top until it ends. Imports keep calendar events' end times and locations, and exports and Google Calendar links carry them. Includes 1.0.1's changes | Draft |
 | 1.0.1 | 2026-10-26 | Fix: a repeating event imported from another time zone that matches yours today but changes its clock rules later (for example Los Angeles vs British Columbia from November 2026) now keeps its source time. Warmer summary. Listing: personal description | Draft |
 | 1.0.0 | 2026-10-24 | First release: live countdowns, repeating items, categories, import/export, seven colour themes, live toolbar icon | Published |
 

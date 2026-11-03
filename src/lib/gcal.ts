@@ -1,3 +1,4 @@
+import { endOf } from "./events";
 import { occurrenceIndex, recurFor, type ExportEntry } from "./ics";
 import { wallDate } from "./recurrence";
 
@@ -18,14 +19,18 @@ export function googleCalendarUrl(entry: ExportEntry, timeZone = Intl.DateTimeFo
   const zone = entry.kind === "series" && !allDay ? entry.series.timeZone : undefined;
   if (zone) timeZone = zone;
   const when = wallDate(new Date(item.dateTime), zone);
+  const end = endOf(item);
+  const until = end === null ? when : wallDate(new Date(end), zone);
 
-  // All-day: end date is exclusive. Timed: a point in time (start = end).
+  // All-day: end date is exclusive (a whole day unless the event says otherwise).
+  // Timed: its end, or a point in time (start = end).
   const dates = allDay
-    ? `${ymd(when)}/${ymd(new Date(when.getFullYear(), when.getMonth(), when.getDate() + 1))}`
-    : `${local(when)}/${local(when)}`;
+    ? `${ymd(when)}/${ymd(end === null ? new Date(when.getFullYear(), when.getMonth(), when.getDate() + 1) : until)}`
+    : `${local(when)}/${local(until)}`;
 
   const params = new URLSearchParams({ action: "TEMPLATE", text: item.title, dates, ctz: timeZone });
   if (item.notes) params.set("details", item.notes);
+  if (item.location) params.set("location", item.location);
   if (entry.kind === "series") {
     params.set("recur", `RRULE:${recurFor(entry.series, occurrenceIndex(entry.series, item), allDay).toString()}`);
   }

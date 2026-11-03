@@ -1,6 +1,7 @@
 import type { ComponentChildren } from "preact";
-import { formatItemDate } from "../lib/dates";
+import { formatWhen } from "../lib/events";
 import type { Item } from "../lib/types";
+import { Icon } from "./Icon";
 
 interface Props {
   item: Item;
@@ -18,7 +19,7 @@ interface Props {
 }
 
 export function ItemTile({ item, past = false, meta, onOpen, selecting = false, selected = false, badge, onPointerDown }: Props) {
-  const date = formatItemDate(new Date(item.dateTime), item.allDay);
+  const date = formatWhen(item);
   // No aria-label: the button is named by its visible content (title, tag,
   // date, notes, meta), so speech-input users can say what they see. Its
   // parts are block-level, so the computed name has word breaks between them.
@@ -43,6 +44,12 @@ export function ItemTile({ item, past = false, meta, onOpen, selecting = false, 
       <span class="tile__date">
         {date}
       </span>
+      {item.location && (
+        <span class="tile__location">
+          <Icon name="pin" />
+          {item.location}
+        </span>
+      )}
       {item.notes && (
         <span class="tile__notes">
           {item.notes}

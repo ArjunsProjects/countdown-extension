@@ -1,11 +1,12 @@
+import { finishOf } from "./events";
 import type { Item, Row } from "./types";
 
 const time = (item: Item) => Date.parse(item.dateTime);
 
 export interface Sections {
-  /** Soonest first; recurring series collapsed into stacks. */
+  /** Soonest first (events happening now lead); recurring series collapsed into stacks. */
   upcoming: Row[];
-  /** Passed and not completed, most recent first. */
+  /** Passed (events: ended) and not completed, most recent first. */
   overdue: Item[];
   /** Most recently completed first. */
   completed: Item[];
@@ -21,7 +22,7 @@ export function buildRows(items: readonly Item[], now: number): Sections {
   for (const item of items) {
     if (item.completedAt) {
       completed.push(item);
-    } else if (time(item) <= now) {
+    } else if (finishOf(item) <= now) {
       overdue.push(item);
     } else if (item.seriesId) {
       const group = series.get(item.seriesId) ?? [];

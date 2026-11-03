@@ -1,7 +1,8 @@
 import { batch } from "@preact/signals";
 import { useLayoutEffect, useRef, useState } from "preact/hooks";
 import { useDismiss, type DismissReason } from "../hooks/useDismiss";
-import { differs, fieldsOf, withFields, type ItemFields } from "../lib/items";
+import { formatDuration, MAX_LOCATION } from "../lib/events";
+import { defaultEnd, differs, endInstant, fieldsOf, reconcileEnd, startOfFields, withFields, type EndFields, type ItemFields } from "../lib/items";
 import type { Item, Unit } from "../lib/types";
 import { fromYmd, nextMatchingDay, toYmd } from "../lib/calendar";
 import { hasNumberToken, renderTitle } from "../lib/numbering";
@@ -14,6 +15,7 @@ import { CategoryField } from "./CategoryField";
 import { DatePicker } from "./DatePicker";
 import { NO_REPEAT, RepeatField, ruleOf, sameRepeat, type RepeatValue } from "./RepeatField";
 import { Icon } from "./Icon";
+import { IconButton } from "./IconButton";
 import { OccurrencePreview } from "./OccurrencePreview";
 import { TitleNumbering } from "./TitleNumbering";
 import { TimeField } from "./TimeField";
@@ -41,6 +43,13 @@ export function repeatOf(s: Series | undefined, from: Item): RepeatValue {
     return { preset, end: s.end, dates: (s.rule.dates ?? []).filter((d) => d >= fromDay) };
   }
   return { preset, end: s.end };
+}
+
+/** The draft's length in minutes (whole days for all-day). */
+function lengthOf(f: ItemFields): number {
+  if (!f.end) return 0;
+  const minutes = Math.round((endInstant(f.end).getTime() - startOfFields(f).getTime()) / 60_000);
+  return f.time ? minutes : Math.round(minutes / 1440) * 1440;
 }
 
 /** How many occurrences a repeat will make, when that's known (for the title preview). */
@@ -90,8 +99,11 @@ export function EditorRow({ item, isNew, unit, now }: Props) {
     ref.current?.scrollIntoView({ block: "nearest" });
   }, []);
 
+  // Every edit goes through reconcileEnd, so the end follows the start and never lands before it.
   const set = <K extends keyof ItemFields>(key: K, value: ItemFields[K]) =>
-    setFields((f) => ({ ...f, [key]: value }));
+    setFields((f) => reconcileEnd(f, { ...f, [key]: value }));
+  const setEnd = (patch: Partial<EndFields> | null) =>
+    setFields((f) => reconcileEnd(f, { ...f, end: patch === null ? null : { ...(f.end ?? defaultEnd(f)), ...patch } }));
 
   // With custom dates, the item's own date is the earliest chosen day; with
   // chosen weekdays, the first of those days on or after the current date.
@@ -197,7 +209,8 @@ export function EditorRow({ item, isNew, unit, now }: Props) {
           value={onlyThis ? ownTitle : fields.title}
           onInput={(e) => (onlyThis ? setOwnTitle(e.currentTarget.value) : set("title", e.currentTarget.value))}
           onKeyDown={(e) => {
-            if (e.key === "Enter") {
+            // The Enter that confirms Japanese, Chinese or Korean input isn't a save.
+            if (e.key === "Enter" && !e.isComposing) {
               e.preventDefault();
               close("enter");
             }
@@ -245,6 +258,29 @@ export function EditorRow({ item, isNew, unit, now }: Props) {
           {repeat.preset !== "dates" && <DatePicker value={fields.date} onChange={(v) => set("date", v)} />}
           <TimeField value={fields.time} onChange={(v) => set("time", v)} />
         </div>
+        {fields.type === "starts" &&
+          (fields.end ? (
+            <div class="editor__ends">
+              <div class="editor__ends-head">
+                <span class="editor__label" aria-hidden="true">
+                  Ends
+                </span>
+                <span class="editor__duration">{formatDuration(lengthOf(fields))}</span>
+                <IconButton icon="close" label={fields.time ? "Remove end time" : "Remove end date"} onClick={() => setEnd(null)} />
+              </div>
+              <div class="editor__when">
+                <DatePicker value={fields.end.date} onChange={(d) => setEnd({ date: d })} label="End date" />
+                {fields.time && (
+                  <TimeField value={fields.end.time} onChange={(t) => setEnd(t ? { time: t } : null)} label="End time" placeholder="End time" />
+                )}
+              </div>
+            </div>
+          ) : (
+            <button type="button" class="button button--quiet editor__add-end" onClick={() => setEnd({})}>
+              <Icon name="plus" />
+              {fields.time ? "Add end time" : "Add end date"}
+            </button>
+          ))}
 
         <RepeatField date={fields.date} value={repeat} onChange={setRepeat} />
         {showOccurrences && draftRule && (
@@ -257,6 +293,26 @@ export function EditorRow({ item, isNew, unit, now }: Props) {
             numberFrom={numberFrom}
           />
         )}
+
+        <div class="field-button field-button--input editor__location">
+          <Icon name="pin" />
+          <input
+            class="editor__location-input"
+            aria-label="Location"
+            placeholder="Add location"
+            maxLength={MAX_LOCATION}
+            autoComplete="off"
+            enterKeyHint="done"
+            value={fields.location}
+            onInput={(e) => set("location", e.currentTarget.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.isComposing) {
+                e.preventDefault();
+                close("enter");
+              }
+            }}
+          />
+        </div>
 
         <textarea
           class="editor__notes"

@@ -194,7 +194,7 @@ function CategoryEditor({ category, anchor }: { category: Category; anchor: { cu
         value={name}
         onInput={(e) => setName(e.currentTarget.value)}
         onKeyDown={(e) => {
-          if (e.key === "Enter") {
+          if (e.key === "Enter" && !e.isComposing) {
             e.preventDefault();
             close();
           }
