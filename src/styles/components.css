@@ -2549,11 +2549,11 @@ button.countdown:active {
   color: var(--cat);
 }
 
-/* While dragging: no text selection, a grabbing cursor everywhere. */
+/* While dragging: no text selection, and the drag's cursor everywhere. */
 body.is-dragging,
 body.is-dragging * {
   user-select: none;
-  cursor: grabbing !important;
+  cursor: var(--drag-cursor, grabbing) !important;
 }
 
 .drag-ghost {

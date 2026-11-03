@@ -26,7 +26,7 @@ Countdown is made by one person. There's no account, no server, no analytics and
 WHAT IT DOES
 • Live countdowns in days, hours, minutes or seconds, for deadlines and events
 • Events with an end time and a place, which show Now while they're happening
-• A calendar: day, 3-day and month views in the side panel, and a full week in its own tab
+• A calendar: day, 3-day and month views in the side panel, and a full week in its own tab. Click to add an event, and drag to move it
 • Syncs between your computers through Chrome sync, with nothing to sign up for, and merges your lists instead of overwriting them
 • Brings in your calendar: .ics files or Google, Apple and Outlook calendar links, with duplicates spotted for you
 • Colour-coded categories for each course, project or trip, with drag and drop
@@ -147,6 +147,7 @@ The source is [PRIVACY.md](PRIVACY.md). Keep it consistent with the Privacy & Da
 
 | Version | Date | Changes | Status |
 |---------|------|---------|--------|
+| 1.4.0 | 2026-11-03 | Edit on the calendar: click or drag on empty time to add an event from a small popover (title, Due or Starts, category), drag events to move them, and drag the bottom edge to change when they end, with Undo. Alt and the arrow keys do the same from the keyboard. Includes 1.3.0 | Draft |
 | 1.3.0 | 2026-11-03 | Sync between computers through Chrome sync: lists merge (never overwrite), duplicates are kept once, edits, completions and deletions (with Undo) reach every computer, and repeating series sync as rules. A switch and status in Appearance, and a 30-day restore of each computer's list from before its first sync. Short description no longer says the data stays on the device. Includes 1.2.0 | Draft |
 | 1.2.0 | 2026-11-03 | A calendar: Day, 3 days and Month views in the side panel, and Week in a full tab. Repeating events show every occurrence, categories work as show/hide calendars, and clicking an event shows its details with Complete and Edit. Keyboard shortcuts while the calendar has focus. Includes 1.1.0 | Draft |
 | 1.1.0 | 2026-11-02 | Events can have an end time and a location, set one at a time or for a whole repeating series. While an event is on, its box shows Now and it stays at the top until it ends. Imports keep calendar events' end times and locations, and exports and Google Calendar links carry them. Includes 1.0.1's changes | Draft |

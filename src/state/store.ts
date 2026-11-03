@@ -1,5 +1,5 @@
 import { batch, signal } from "@preact/signals";
-import { toLocalISO } from "../lib/dates";
+import { formatClock, formatShortDateTime, toLocalISO } from "../lib/dates";
 import { durationOf, MAX_LOCATION } from "../lib/events";
 import * as ops from "../lib/items";
 import { moveIndex, type Category, type CategoryColor } from "../lib/categories";
@@ -116,6 +116,49 @@ export function setPrefs(patch: Partial<Prefs>) {
   const next = { ...prefs.value, ...patch };
   persist("prefs", next);
   prefs.value = next;
+}
+
+/**
+ * Moves an item, or changes its end, from the calendar, with Undo. An
+ * occurrence the series hasn't generated yet (`virtual`) is created with
+ * the new time, and Undo removes it again. Like editing an occurrence's
+ * time in the editor, this changes only that occurrence.
+ */
+export function rescheduleItem(target: Item, patch: { dateTime: string; endDateTime?: string }, virtual: boolean, now = new Date()) {
+  const before = items.value.find((i) => i.id === target.id);
+  const stamp = toLocalISO(now);
+  const base = before ?? { ...target, createdAt: stamp };
+  const next: Item = { ...base, dateTime: patch.dateTime, updatedAt: stamp };
+  if (patch.endDateTime) next.endDateTime = patch.endDateTime;
+  else delete next.endDateTime;
+  if (before && Date.parse(before.dateTime) === Date.parse(next.dateTime) && (before.endDateTime ?? "") === (next.endDateTime ?? "")) return;
+
+  if (before) saveItem(next);
+  else if (virtual) addItem(next);
+  else return;
+
+  const moved = Date.parse(next.dateTime) !== Date.parse(base.dateTime);
+  showToast({
+    message: moved
+      ? `Moved to ${formatShortDateTime(new Date(next.dateTime), next.allDay, now)}`
+      : `Now ends ${formatClock(new Date(next.endDateTime!))}`,
+    action: {
+      label: "Undo",
+      run: () => (before ? saveItem(before) : setItems(items.value.filter((i) => i.id !== next.id))),
+    },
+  });
+}
+
+/** Adds an item made on the calendar (quick create). */
+export function addFromCalendar(fields: { title: string; type: Item["type"]; start: Date; end: Date | null; categoryId: string | null }, now = new Date()): Item {
+  const item = ops.newItem(now);
+  item.title = fields.title.trim();
+  item.type = fields.type;
+  item.dateTime = toLocalISO(fields.start);
+  if (fields.type === "starts" && fields.end && fields.end > fields.start) item.endDateTime = toLocalISO(fields.end);
+  if (fields.categoryId) item.categoryId = fields.categoryId;
+  addItem(item);
+  return item;
 }
 
 /** Takes the result of merging with other computers (sync), as one change. */

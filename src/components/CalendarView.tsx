@@ -1,15 +1,18 @@
 import { useId, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
-import { allDayLanes, eventsInRange, layoutDay, onDay, rangeLabel, rangeLabelShort, segmentsForDay, viewDays, type CalEvent, type CalendarView as ViewName, type Placed } from "../lib/agenda";
+import { allDayLanes, eventsInRange, layoutDay, onDay, rangeLabel, rangeLabelShort, segmentsForDay, viewDays, type CalEvent, type CalendarView as ViewName, type Placed, type Segment } from "../lib/agenda";
+import { minutesOfDay, moveBy, newRange, pointerMinutes, resizeEnd, SNAP, type Reschedule } from "../lib/gridEdit";
 import { formatFullDay, sameDay, toDateParts } from "../lib/calendar";
 import { formatClock, formatDay } from "../lib/dates";
 import { formatClockRangeShort, phaseOf } from "../lib/events";
 import type { DateParts } from "../lib/parse";
 import { anchor, categoryOf, goToday, hiddenCategories, setView, step, wide } from "../state/calendar";
-import { categories, items, series, skipOccurrences } from "../state/store";
+import { trackPress } from "../state/drag";
+import { categories, items, rescheduleItem, series, skipOccurrences } from "../state/store";
 import { CalendarMonth } from "./CalendarMonth";
 import { CategoryFilter } from "./CategoryFilter";
 import { EventDetails } from "./EventDetails";
 import { IconButton } from "./IconButton";
+import { QuickCreate } from "./QuickCreate";
 
 /** Pixels per hour on the time grid (matches --cal-hour in calendar.css). */
 const HOUR_PX = 48;
@@ -115,8 +118,38 @@ interface GridProps {
   onOpen: (e: CalEvent, el: HTMLElement) => void;
 }
 
+/** What's being dragged, and where it would land (for the preview). */
+type Gesture =
+  | { kind: "move" | "resize"; event: CalEvent; patch: Reschedule }
+  | { kind: "create"; day: number; start: Date; end: Date };
+
+/** A new item's time on the grid, while the quick-create popover is open. */
+interface Draft {
+  day: number;
+  start: Date;
+  end: Date;
+}
+
+const sameTime = (a: string | undefined, b: string | undefined) => (a && b ? Date.parse(a) === Date.parse(b) : a === b);
+const unchanged = (item: CalEvent["item"], patch: Reschedule) => sameTime(item.dateTime, patch.dateTime) && sameTime(item.endDateTime, patch.endDateTime);
+
+/** Two previews look alike (the pointer moved within one 15-minute step), so the grid needn't redraw. */
+function samePreview(a: Gesture, b: Gesture) {
+  if (a.kind === "create") return b.kind === "create" && a.day === b.day && a.start.getTime() === b.start.getTime() && a.end.getTime() === b.end.getTime();
+  return b.kind !== "create" && a.kind === b.kind && sameTime(a.patch.dateTime, b.patch.dateTime) && sameTime(a.patch.endDateTime, b.patch.endDateTime);
+}
+
+/** Alt+arrow keys on a focused event. */
+const KEY_MINUTES: Record<string, number> = { ArrowUp: -SNAP, ArrowDown: SNAP };
+const KEY_DAYS: Record<string, number> = { ArrowLeft: -1, ArrowRight: 1 };
+
 function TimeGrid({ days, events, now, onOpen }: GridProps) {
+  const helpId = useId();
   const scrollRef = useRef<HTMLDivElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const draftRef = useRef<HTMLDivElement>(null);
+  const [gesture, setGesture] = useState<Gesture | null>(null);
+  const [draft, setDraft] = useState<Draft | null>(null);
   const today = toDateParts(new Date(now));
   const todayIndex = days.findIndex((d) => sameDay(d, today));
   const nowMinutes = new Date(now).getHours() * 60 + new Date(now).getMinutes();
@@ -124,6 +157,8 @@ function TimeGrid({ days, events, now, onOpen }: GridProps) {
   const [startMinute] = useState(() => (todayIndex >= 0 ? Math.max(0, nowMinutes - 60) : 7 * 60));
   const lanes = allDayLanes(events, days);
   const laneCount = lanes.reduce((n, l) => Math.max(n, l.lane + 1), 0);
+  // Laid out when the events change, not on every pointer move of a drag.
+  const placedByDay = useMemo(() => days.map((d) => layoutDay(segmentsForDay(events, d), MOMENT_MINUTES)), [days, events]);
 
   // scroll-initial-target (Chrome 133+) places the grid on first render;
   // older versions get the same position from script.
@@ -133,8 +168,103 @@ function TimeGrid({ days, events, now, onOpen }: GridProps) {
     }
   }, []);
 
+  /** The time of day at a height on the screen, and the day column at a point across. */
+  const minutesAt = (y: number) => pointerMinutes(y - bodyRef.current!.getBoundingClientRect().top, HOUR_PX);
+  const dayAt = (x: number) => {
+    const cols = [...bodyRef.current!.querySelectorAll<HTMLElement>(".time-grid__col")];
+    const i = cols.findIndex((c) => x < c.getBoundingClientRect().right);
+    return i < 0 ? cols.length - 1 : i;
+  };
+
+  const show = (next: Gesture) => setGesture((current) => (current && samePreview(current, next) ? current : next));
+
+  /** Pressing an event: drag it to move it, or drag its bottom edge to change its end. */
+  const pressEvent = (e: PointerEvent, event: CalEvent) => {
+    const resize = (e.target as Element).closest(".cal-event__resize") !== null;
+    const downDay = dayAt(e.clientX);
+    const downMinutes = minutesAt(e.clientY);
+    const patchAt = (x: number, y: number): Reschedule =>
+      resize
+        ? { dateTime: event.item.dateTime, endDateTime: resizeEnd(event.item, days[dayAt(x)]!, minutesAt(y)) }
+        : moveBy(event.item, dayOffset(days, downDay, dayAt(x)), minutesAt(y) - downMinutes);
+    trackPress(e, {
+      scroller: scrollRef.current,
+      cursor: resize ? "ns-resize" : undefined,
+      onDrag: (x, y) => show({ kind: resize ? "resize" : "move", event, patch: patchAt(x, y) }),
+      onRelease: (dragged, x, y) => {
+        setGesture(null);
+        const patch = patchAt(x, y);
+        if (dragged && !unchanged(event.item, patch)) rescheduleItem(event.item, patch, event.virtual);
+      },
+      onCancel: () => setGesture(null),
+    });
+  };
+
+  /** Pressing empty space: a click makes an hour there; a drag covers the time it crosses. */
+  const pressColumn = (e: PointerEvent, day: number) => {
+    if ((e.target as Element).closest(".cal-event")) return;
+    const from = minutesAt(e.clientY);
+    const rangeTo = (y?: number): Draft => ({ day, ...newRange(days[day]!, from, y === undefined ? undefined : minutesAt(y)) });
+    trackPress(e, {
+      scroller: scrollRef.current,
+      cursor: "ns-resize",
+      onDrag: (_, y) => show({ kind: "create", ...rangeTo(y) }),
+      onRelease: (dragged, _, y) => {
+        setGesture(null);
+        setDraft(rangeTo(dragged ? y : undefined));
+      },
+      onCancel: () => setGesture(null),
+    });
+  };
+
+  /** Touch has no drags here (a drag scrolls), but a tap on empty space makes an hour there. */
+  const tapColumn = (e: MouseEvent, day: number) => {
+    if ((e as PointerEvent).pointerType !== "touch" || (e.target as Element).closest(".cal-event")) return;
+    setDraft({ day, ...newRange(days[day]!, minutesAt(e.clientY)) });
+  };
+
+  /** Alt+arrows on a focused event: move it 15 minutes or a day; with Shift, change its end. */
+  const keyEvent = (e: KeyboardEvent, event: CalEvent) => {
+    const minutes = KEY_MINUTES[e.key] ?? 0;
+    const deltaDays = KEY_DAYS[e.key] ?? 0;
+    if (!e.altKey || e.ctrlKey || e.metaKey || (!minutes && !deltaDays)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const { item } = event;
+    let patch: Reschedule;
+    if (e.shiftKey) {
+      if (!item.endDateTime || !minutes) return;
+      const end = new Date(Date.parse(item.endDateTime) + minutes * 60_000);
+      patch = { dateTime: item.dateTime, endDateTime: resizeEnd(item, toDateParts(end), minutesOfDay(end)) };
+    } else {
+      patch = moveBy(item, deltaDays, minutes);
+    }
+    if (unchanged(item, patch)) return;
+    rescheduleItem(item, patch, event.virtual);
+    // Follow it to the next days when it leaves the ones shown, and keep focus on it where it's redrawn.
+    const landed = toDate(toDateParts(new Date(patch.dateTime)));
+    if (landed < toDate(days[0]!)) step(-1);
+    else if (landed > toDate(days.at(-1)!)) step(1);
+    setTimeout(() => document.querySelector<HTMLElement>(`[data-event-id="${CSS.escape(item.id)}"]`)?.focus());
+  };
+
+  /** The event as it would be after the gesture, for the preview. */
+  const previewEvent: CalEvent | null =
+    gesture && gesture.kind !== "create"
+      ? (() => {
+          const item = { ...gesture.event.item, ...gesture.patch };
+          const start = Date.parse(item.dateTime);
+          return { ...gesture.event, item, start, end: item.endDateTime ? Date.parse(item.endDateTime) : start };
+        })()
+      : null;
+  const lifted = gesture && gesture.kind !== "create" ? gesture.event.id : null;
+  const block = gesture?.kind === "create" ? gesture : draft;
+
   return (
     <div class="time-grid" style={{ "--days": days.length }}>
+      <p id={helpId} class="visually-hidden">
+        Drag to move. Drag the bottom edge to change the end. Alt and arrow keys move it by 15 minutes or a day; add Shift to change the end.
+      </p>
       {/* Column headings repeat each day section's own name, so they're hidden from screen readers. */}
       <div class="time-grid__head" aria-hidden="true">
         <span />
@@ -157,7 +287,7 @@ function TimeGrid({ days, events, now, onOpen }: GridProps) {
       )}
 
       <div ref={scrollRef} class="time-grid__scroll">
-        <div class="time-grid__body">
+        <div ref={bodyRef} class="time-grid__body">
           <div class="time-grid__hours" aria-hidden="true">
             {Array.from({ length: 23 }, (_, h) => (
               <span key={h} class="time-grid__hour" style={{ top: px((h + 1) * 60) }}>
@@ -165,36 +295,65 @@ function TimeGrid({ days, events, now, onOpen }: GridProps) {
               </span>
             ))}
           </div>
-          {days.map((d, i) => {
-            const placed = layoutDay(segmentsForDay(events, d), MOMENT_MINUTES);
-            return (
-              <section key={i} class="time-grid__col" aria-label={`${formatDay(toDate(d))}${i === todayIndex ? ", today" : ""}`}>
-                <ul role="list" class="time-grid__events">
-                  {placed.map((p) => (
-                    <li
-                      key={p.event.id}
-                      class="time-grid__slot"
-                      style={{
-                        // A late moment (11:59 PM) is drawn ending at midnight, not past it.
-                        top: px(Math.min(p.top, 1440 - Math.max(p.bottom - p.top, MOMENT_MINUTES))),
-                        height: px(Math.max(p.bottom - p.top, MOMENT_MINUTES)),
-                        left: `${(p.col / p.cols) * 100}%`,
-                        width: `${100 / p.cols}%`,
-                      }}
-                    >
-                      <EventButton event={p.event} now={now} onOpen={onOpen} placed={p} />
-                    </li>
-                  ))}
-                </ul>
-                {i === todayIndex && <div class="time-grid__now" style={{ top: px(nowMinutes) }} aria-hidden="true" />}
-              </section>
-            );
-          })}
+          {days.map((d, i) => (
+            <section
+              key={i}
+              class="time-grid__col"
+              aria-label={`${formatDay(toDate(d))}${i === todayIndex ? ", today" : ""}`}
+              onPointerDown={(e) => pressColumn(e, i)}
+              onClick={(e) => tapColumn(e, i)}
+            >
+              <ul role="list" class="time-grid__events">
+                {placedByDay[i]!.map((p) => (
+                  <li key={p.event.id} class={`time-grid__slot${lifted === p.event.id ? " time-grid__slot--lifted" : ""}`} style={slotStyle(p)}>
+                    <EventButton event={p.event} now={now} onOpen={onOpen} placed={p} describedBy={helpId} onPress={pressEvent} onKey={keyEvent} />
+                  </li>
+                ))}
+              </ul>
+              {previewEvent &&
+                segmentsForDay([previewEvent], d).map((g) => (
+                  <div key="preview" class="time-grid__slot time-grid__slot--preview" style={slotStyle({ ...g, col: 0, cols: 1 })} aria-hidden="true">
+                    <EventButton event={g.event} now={now} onOpen={onOpen} placed={{ ...g, col: 0, cols: 1 }} preview />
+                  </div>
+                ))}
+              {block?.day === i && (
+                <div
+                  ref={block === draft ? draftRef : undefined}
+                  class="time-grid__slot time-grid__slot--preview"
+                  style={slotStyle({ top: minutesOfDay(block.start), bottom: minutesOfDay(block.end) || 1440, col: 0, cols: 1 })}
+                  aria-hidden="true"
+                >
+                  <span class="cal-event cal-event--block">
+                    <span class="cal-event__title">New item</span>
+                    <span class="cal-event__time">{formatClockRangeShort(block.start, block.end)}</span>
+                  </span>
+                </div>
+              )}
+              {i === todayIndex && <div class="time-grid__now" style={{ top: px(nowMinutes) }} aria-hidden="true" />}
+            </section>
+          ))}
           <div class="time-grid__start" style={{ top: px(startMinute) }} aria-hidden="true" />
         </div>
       </div>
+      {draft && <QuickCreate start={draft.start} end={draft.end} anchor={draftRef} onClose={() => setDraft(null)} />}
     </div>
   );
+}
+
+/** Whole days between two shown columns (columns are consecutive days). */
+const dayOffset = (days: DateParts[], from: number, to: number) =>
+  Math.round((toDate(days[to]!).getTime() - toDate(days[from]!).getTime()) / 86_400_000);
+
+/** Where a laid-out event sits in its column. */
+function slotStyle(p: { top: number; bottom: number; col: number; cols: number }) {
+  const height = Math.max(p.bottom - p.top, MOMENT_MINUTES);
+  return {
+    // A late moment (11:59 PM) is drawn ending at midnight, not past it.
+    top: px(Math.min(p.top, 1440 - height)),
+    height: px(height),
+    left: `${(p.col / p.cols) * 100}%`,
+    width: `${100 / p.cols}%`,
+  };
 }
 
 // ── An event on the grid, in the all-day row, or in a day's agenda ──
@@ -203,11 +362,17 @@ interface EventButtonProps {
   event: CalEvent;
   now: number;
   onOpen: (e: CalEvent, el: HTMLElement) => void;
-  placed?: Placed;
+  placed?: Placed | (Segment & { col: number; cols: number });
   variant?: "block" | "chip" | "row";
+  /** Grid events: the drag and keyboard hints. */
+  describedBy?: string;
+  onPress?: (e: PointerEvent, event: CalEvent) => void;
+  onKey?: (e: KeyboardEvent, event: CalEvent) => void;
+  /** Drawn as a drag preview (not interactive). */
+  preview?: boolean;
 }
 
-function EventButton({ event, now, onOpen, placed, variant = "block" }: EventButtonProps) {
+function EventButton({ event, now, onOpen, placed, variant = "block", describedBy, onPress, onKey, preview = false }: EventButtonProps) {
   const { item } = event;
   const cat = categoryOf(item.categoryId);
   const moment = event.start === event.end;
@@ -215,6 +380,7 @@ function EventButton({ event, now, onOpen, placed, variant = "block" }: EventBut
   const start = new Date(event.start);
   const time = event.allDay ? "All day" : moment ? formatClock(start).replace(":00", "") : formatClockRangeShort(start, new Date(event.end));
   const status = item.completedAt ? "Completed" : phase === "now" ? "Happening now" : item.type === "due" ? "Due" : "";
+  const resizable = variant === "block" && !moment && !placed?.endsAfter && onPress !== undefined;
   const classes = [
     "cal-event",
     `cal-event--${variant}`,
@@ -227,13 +393,31 @@ function EventButton({ event, now, onOpen, placed, variant = "block" }: EventBut
     .filter(Boolean)
     .join(" ");
 
+  if (preview) {
+    return (
+      <span class={classes}>
+        <span class="cal-event__title">{item.title}</span>
+        <span class="cal-event__time">{time}</span>
+      </span>
+    );
+  }
+
   return (
-    <button type="button" class={classes} onClick={(e) => onOpen(event, e.currentTarget)}>
+    <button
+      type="button"
+      class={classes}
+      data-event-id={item.id}
+      aria-describedby={onPress ? describedBy : undefined}
+      onClick={(e) => onOpen(event, e.currentTarget)}
+      onPointerDown={onPress ? (e) => onPress(e, event) : undefined}
+      onKeyDown={onKey ? (e) => onKey(e, event) : undefined}
+    >
       {variant === "row" && <span class="cal-event__when">{time}</span>}
       <span class="cal-event__title">{item.title}</span>
       {variant === "block" && <span class="cal-event__time">{time}</span>}
       {variant !== "chip" && item.location && <span class="cal-event__place">{item.location}</span>}
       {status && <span class="visually-hidden">, {status}</span>}
+      {resizable && <span class="cal-event__resize" aria-hidden="true" />}
     </button>
   );
 }

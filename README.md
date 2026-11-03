@@ -15,7 +15,7 @@ So I built a simple panel that sits beside whatever I'm working on, pulls in my 
 ## What it does
 
 - **Live countdowns** in days, hours, minutes or seconds, for deadlines (**Due**) and events (**Starts**)
-- **A calendar:** Day, 3 days and Month views in the side panel, and a full Week in its own tab, with your categories as colour-coded calendars
+- **A calendar:** Day, 3 days and Month views in the side panel, and a full Week in its own tab, with your categories as colour-coded calendars. Click or drag on it to add an event, and drag events to move them or change when they end
 - **Events with an end and a place,** like a lecture from 12:30 to 2:00 in Swing Space, which show **Now** while they're on
 - **Brings in your calendar:** `.ics` files or Google, Apple and Outlook calendar links, with duplicates spotted for you
 - **Colour-coded categories** for each course, project or trip, with drag and drop
@@ -80,6 +80,7 @@ A quick guide to everything you can do.
 | Edit an item | Click its tile. **Complete** and **Remove** are at the bottom of the editor. |
 | Change the countdown unit | Click **Days** (top left) to cycle every box through Days → Hours → Minutes → Seconds. Click a single countdown box to cycle just that item; it shows a small unit label (HRS, MIN, SEC) until it cycles back to the header's unit. |
 | See your calendar | The **View** button (calendar icon) in the header switches between **List**, **Day**, **3 days** and **Month**, plus **Week** when there's room (the calendar's own tab, or a side panel dragged wider). **Open calendar in a tab** opens it full size. Click an event for its details, then **Complete** it or **Edit** it (the editor opens in the list, and the calendar comes back when you close it). The filter icon shows or hides each category on the calendar. |
+| Add or move things on the calendar | In Day, 3 days or Week, click empty time to add an hour there, or drag down the grid to cover the time you want. Type a title and press Enter (**More options** opens the full editor). Drag an event to move it, to another day too, or drag its bottom edge to change when it ends. Times snap to 15 minutes, and a toast offers Undo. From the keyboard, focus an event and press Alt with the arrow keys: Up and Down move it 15 minutes, Left and Right a day; add Shift to change its end instead. |
 | Give an event an end and a place | For a **Starts** item, **Add end time** (or **Add end date** for an all-day event). Moving the start moves the end with it, and an end earlier than the start means the next day (9 PM – 2 AM). **Add location** sits above the notes. For a repeating stack, the stack editor sets one end time and one location for every occurrence. |
 | Repeat an item | In the editor, **Repeat**: daily, weekdays, weekly, weekly on chosen days, every 2 weeks, monthly, yearly, or **Custom dates…**. Then choose when it ends. |
 | Number repeating titles | With Repeat set, **# Number each occurrence** (select the "1" in "Chapter 1" first to replace it). |
@@ -98,7 +99,7 @@ A quick guide to everything you can do.
 
 ### Keyboard
 
-Everything works without a mouse. Tab moves between controls; Enter or Space activates. In the calendar, arrows move by day or week, Home/End to the week's ends, PageUp/PageDown by month (with Shift: by year). In the time field, arrows move through the list and Enter picks. Escape closes the innermost popover, editor or sheet, and cancels a drag. Cmd/Ctrl+Z undoes while the toast is showing. While focus is in the calendar: **T** today, **J**/**N** next, **K**/**P** previous, **D** day, **X** 3 days, **W** week (when there's room), **M** month. Dragging is mouse-only; the **Category** field in editors and **Move up / Move down** in a category's menu do the same jobs from the keyboard.
+Everything works without a mouse. Tab moves between controls; Enter or Space activates. In the calendar, arrows move by day or week, Home/End to the week's ends, PageUp/PageDown by month (with Shift: by year). In the time field, arrows move through the list and Enter picks. Escape closes the innermost popover, editor or sheet, and cancels a drag. Cmd/Ctrl+Z undoes while the toast is showing. While focus is in the calendar: **T** today, **J**/**N** next, **K**/**P** previous, **D** day, **X** 3 days, **W** week (when there's room), **M** month. Dragging needs a mouse or trackpad (on a touchscreen, tapping empty time on the calendar adds an event, and dragging scrolls). Each drag has a keyboard route: the **Category** field in editors and **Move up / Move down** in a category's menu for the list, and Alt+arrows on a calendar event, with Shift for its end.
 
 ## Permissions, in detail
 
@@ -132,8 +133,8 @@ src/sidepanel/     panel page, entry point and root component
 src/components/    UI components (Preact)
 src/hooks/         shared hooks: dismissal, presence animations, sheet height
 src/lib/           pure logic, unit-tested: dates, parsing, calendar, countdowns,
-                   recurrence, numbering, categories, calendar layout,
-                   time zones,
+                   recurrence, numbering, categories, calendar layout
+                   and editing, time zones,
                    .ics import/export, duplicate detection, storage
                    validation, positioning, palettes, toolbar icon
 src/state/         signals and actions: items, series, categories, prefs,
@@ -155,7 +156,7 @@ tests/             Vitest unit tests
 
 ### Testing
 
-`npm test` runs 340 unit tests covering countdown math and formatting, date and time parsing, the calendar, recurrence (DST, month ends, leap years), numbering, categories (grouping, order, assignment, undo), events with an end, calendar layout (ranges, repeats beyond the stored ones, overlapping events, the all-day row), sync (the record format, merge rules, and several simulated computers following Chrome's sync behaviour, including seeded random use), `.ics` export and import (round trips, time zones, RRULE mapping, EXDATE and moved occurrences, RFC 5545 line rules), duplicate detection, calendar links, storage validation and backends, the store's actions and undo, multi-panel sync, selection and import. Exported rules are cross-checked by expanding them with ical.js. The suite is run in several time zones (`TZ=Europe/London npm test`, `TZ=Asia/Kolkata npm test`, …) because date bugs hide there.
+`npm test` runs 350 unit tests covering countdown math and formatting, date and time parsing, the calendar, recurrence (DST, month ends, leap years), numbering, categories (grouping, order, assignment, undo), events with an end, calendar layout (ranges, repeats beyond the stored ones, overlapping events, the all-day row), editing on the calendar (moves, new ends, new events from a click or a drag, across a daylight-saving change, with Undo), sync (the record format, merge rules, and several simulated computers following Chrome's sync behaviour, including seeded random use), `.ics` export and import (round trips, time zones, RRULE mapping, EXDATE and moved occurrences, RFC 5545 line rules), duplicate detection, calendar links, storage validation and backends, the store's actions and undo, multi-panel sync, selection and import. Exported rules are cross-checked by expanding them with ical.js. The suite is run in several time zones (`TZ=Europe/London npm test`, `TZ=Asia/Kolkata npm test`, …) because date bugs hide there.
 
 Accessibility is checked with axe-core against every main screen in light and dark mode (WCAG 2.2 AA: 0 violations).
 
@@ -188,6 +189,9 @@ Accessibility is checked with axe-core against every main screen in light and da
   - **Month:** coloured dots per day in the panel; titled chips where there's room (a tab or a wide panel). Picking a day lists its events below.
   - **Where it opens:** the grid scrolls to an hour before now on today, or the morning. Each page remembers its own view, so the panel and the calendar tab can show different ones.
   - **Editing:** Edit opens the item (or, for a later occurrence, its series) in the list and expands its category or the Overdue section if needed; the calendar comes back when the editor closes.
+  - **Changing it on the grid:** a click on empty time makes an hour from the 15-minute slot clicked; a drag covers the slots it crosses, within that day. The quick-create popover makes a **Starts** event by default (switch to **Due** for a deadline) and picks no category, or the first one shown if items without a category are hidden on the calendar. Escape or a click elsewhere discards it; clicking another empty slot moves it there.
+  - **Moving:** an event keeps its length, and its start snaps to 15 minutes by the wall clock, so 9:00 stays 9:00 across a daylight-saving change. A sideways drag that hasn't gone a whole step up or down keeps the time of day. The bottom edge can be dragged into the next days, but never above 15 minutes after the start. A drag scrolls the grid when it nears the top or bottom, and Escape cancels it.
+  - **Repeating events:** moving one occurrence changes only that one, as editing its time does; a later occurrence the series hasn't stored yet is stored with its new time (Undo takes it back).
 - **Events with an end.** A **Starts** item can have an end and a location. It counts down to its start, then its box shows **Now** (filled with the accent, or its category's colour) and stays at the top of the list until it ends, with the time left until the end in the tooltip. After that it moves to the bottom section as **Ended**. Events without an end still move there as **Started** the moment they begin. An all-day event lasts its whole day unless it has its own end date. Deadlines are always a single moment.
 - **Categories.** With no categories the panel is one list, as before. Once you add one, the upcoming list splits into sections in your chosen order, each sorted soonest first, with uncategorised items under **Other** at the end. Overdue and Completed stay as single lists across all categories, with each row keeping its category's colour.
   - A category colours its rows' countdown boxes and adds a stripe to each tile. The eight colours are tuned so every one meets WCAG AA in both themes; there's no free colour picker because arbitrary colours can't guarantee that.

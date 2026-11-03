@@ -265,6 +265,77 @@
   scroll-initial-target: nearest;
 }
 
+/* ── Editing on the grid ───────────────────────────────────── */
+/* Pressing the grid starts a drag or makes an event, never a text selection. */
+.time-grid__body {
+  user-select: none;
+}
+
+/* The bottom edge of a timed event: drag it to change the end. */
+.cal-event__resize {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 6px;
+  cursor: ns-resize;
+}
+
+/* A small grip on hover, so the edge can be found. */
+.cal-event--block:hover .cal-event__resize::after {
+  content: "";
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  width: 16px;
+  height: 2px;
+  translate: -50% 0;
+  border-radius: var(--radius-full);
+  background: currentColor;
+  opacity: 0.6;
+}
+
+/* While dragging, the event stays faintly in place and a preview shows where it would land. */
+.time-grid__slot--lifted {
+  opacity: 0.4;
+}
+
+.time-grid__slot--preview {
+  z-index: 2;
+  pointer-events: none;
+}
+
+.time-grid__slot--preview .cal-event {
+  box-shadow: inset 3px 0 0 var(--cat, var(--color-accent)), var(--shadow-raised);
+}
+
+/* ── Quick create ──────────────────────────────────────────── */
+.popover--quick {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  width: min(300px, calc(100vw - var(--space-2) * 2));
+  padding: var(--space-1-5);
+}
+
+.popover--quick .field-error {
+  margin-top: calc(var(--space-1) * -1 + var(--space-0-5));
+}
+
+.quick-create__when {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+}
+
+.quick-create__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-1);
+  margin-top: var(--space-0-5);
+}
+
 /* ── Events ────────────────────────────────────────────────── */
 /* The category colour on its own tint over glass: the pair measured for
    countdown boxes (4.57:1 or better in every colour and theme). */
@@ -284,6 +355,10 @@
   font-size: var(--text-xs);
   line-height: var(--leading-xs);
   text-align: left;
+}
+
+.cal-event--block {
+  position: relative;
 }
 
 .cal-event:hover {
@@ -660,6 +735,11 @@
 @media (forced-colors: active) {
   .cal-event {
     border: 1px solid CanvasText;
+  }
+
+  .time-grid__slot--preview .cal-event {
+    border-style: dashed;
+    outline: 2px solid Highlight;
   }
 
   .cal-event--now {

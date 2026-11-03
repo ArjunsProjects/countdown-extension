@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Countdown",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "See how long you really have until every deadline and exam. Live countdowns and a calendar in Chrome's side panel.",
   "minimum_chrome_version": "123",
   "permissions": [
