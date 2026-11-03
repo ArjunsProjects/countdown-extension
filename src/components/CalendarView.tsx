@@ -5,7 +5,7 @@ import { formatClock, formatDay } from "../lib/dates";
 import { formatClockRangeShort, phaseOf } from "../lib/events";
 import type { DateParts } from "../lib/parse";
 import { anchor, categoryOf, goToday, hiddenCategories, setView, step, wide } from "../state/calendar";
-import { categories, items, series } from "../state/store";
+import { categories, items, series, skipOccurrences } from "../state/store";
 import { CalendarMonth } from "./CalendarMonth";
 import { CategoryFilter } from "./CategoryFilter";
 import { EventDetails } from "./EventDetails";
@@ -42,7 +42,8 @@ export function CalendarView({ view, now }: { view: ViewName; now: number }) {
   const days = viewDays(view, a);
   const from = toDate(days[0]!).getTime();
   const to = new Date(days.at(-1)!.year, days.at(-1)!.month, days.at(-1)!.day + 1).getTime();
-  const all = useMemo(() => eventsInRange(items.value, series.value, from, to), [items.value, series.value, from, to]);
+  const skip = skipOccurrences.value;
+  const all = useMemo(() => eventsInRange(items.value, series.value, from, to, skip), [items.value, series.value, from, to, skip]);
   const hidden = hiddenCategories.value;
   const events = useMemo(() => all.filter((e) => !hidden.has(filterKey(e.item.categoryId))), [all, hidden, categories.value]);
   const [opened, setOpened] = useState<Opened | null>(null);

@@ -27,6 +27,8 @@ export const series = signal<Series[]>([]);
 export const categories = signal<Category[]>([]);
 export const prefs = signal<Prefs>(DEFAULT_PREFS);
 export const ready = signal(false);
+/** Occurrences removed on some computer (from sync): top-up and the calendar never bring them back. */
+export const skipOccurrences = signal<ReadonlySet<string>>(new Set());
 
 let backend: StorageBackend;
 
@@ -114,6 +116,27 @@ export function setPrefs(patch: Partial<Prefs>) {
   const next = { ...prefs.value, ...patch };
   persist("prefs", next);
   prefs.value = next;
+}
+
+/** Takes the result of merging with other computers (sync), as one change. */
+export function applySyncState(next: { items: Item[]; series: Series[]; categories: Category[]; prefs: Prefs }) {
+  batch(() => {
+    if (next.items !== items.value) setItems(next.items);
+    if (next.series !== series.value) setSeries(next.series);
+    if (next.categories !== categories.value) setCategories(next.categories);
+    if (next.prefs !== prefs.value) {
+      persist("prefs", next.prefs);
+      prefs.value = next.prefs;
+    }
+  });
+}
+
+/** Puts back a saved state wholesale (restoring the list from before sync). */
+export function replaceState(next: { items: Item[]; series: Series[]; categories: Category[]; prefs: Prefs; completions: CompletionRecord[] }) {
+  batch(() => {
+    applySyncState(next);
+    setCompletions(next.completions);
+  });
 }
 
 // ── Actions ───────────────────────────────────────────────────
@@ -562,7 +585,7 @@ export function ensureOccurrences(now: number) {
   const added: Item[] = [];
   let changed = false;
   const nextSeries = series.value.map((s) => {
-    const result = topUp(s, [...items.value, ...added], now);
+    const result = topUp(s, [...items.value, ...added], now, skipOccurrences.value);
     added.push(...result.added);
     if (result.series !== s) changed = true;
     return result.series;

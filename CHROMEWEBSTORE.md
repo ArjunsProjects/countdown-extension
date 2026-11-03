@@ -11,8 +11,8 @@ Everything the Chrome Developer Dashboard asks for, ready to copy.
 **Extension Name**
 Countdown
 
-**Short Description** (matches manifest.json's description; 131 of 132 characters)
-See how long you really have until every deadline and exam. Live countdowns in Chrome's side panel. Your data stays on your device.
+**Short Description** (matches manifest.json's description; 114 of 132 characters)
+See how long you really have until every deadline and exam. Live countdowns and a calendar in Chrome's side panel.
 
 **Detailed Description** (plain text; the store strips Markdown)
 
@@ -21,12 +21,13 @@ Countdown shows exactly how long you have left until every deadline and event, r
 
 I made it for myself. If your brain works a bit like mine (a little ADHD, maybe), it's hard to feel how close something really is when it's just a block on a calendar. "Due Friday" doesn't land the way "2 days left" does. So I built a simple panel that sits beside whatever I'm working on, pulls in my calendar, and turns every deadline and exam into a live countdown. No more digging through my calendar to work out how much time I've got.
 
-Countdown is made by one person, and it keeps everything on your device. There's no account, no server, no analytics and no tracking.
+Countdown is made by one person. There's no account, no server, no analytics and no tracking: your list lives in Chrome, and moves between your computers through Chrome sync.
 
 WHAT IT DOES
 • Live countdowns in days, hours, minutes or seconds, for deadlines and events
 • Events with an end time and a place, which show Now while they're happening
 • A calendar: day, 3-day and month views in the side panel, and a full week in its own tab
+• Syncs between your computers through Chrome sync, with nothing to sign up for, and merges your lists instead of overwriting them
 • Brings in your calendar: .ics files or Google, Apple and Outlook calendar links, with duplicates spotted for you
 • Colour-coded categories for each course, project or trip, with drag and drop
 • Repeating items, like weekly homework numbered Chapter 4, 5, 6 and so on
@@ -39,7 +40,7 @@ GETTING STARTED
 3. Use the arrow next to + to make categories, then drag items into them.
 
 YOUR PRIVACY
-Everything you add stays in Chrome on your own device. None of it is sent to me or anyone else, and there's nothing to sign up for. Countdown asks for no access to websites when you install it. If you import a calendar link, Chrome asks whether Countdown may read that one site, and that's the only site it ever contacts.
+Everything you add is stored in Chrome on your computer, and Chrome sync carries it to your other computers signed in to the same Chrome profile (you can turn this off in Countdown's Appearance menu). None of it is ever sent to me or anyone else, and there's nothing to sign up for. Countdown asks for no access to websites when you install it. If you import a calendar link, Chrome asks whether Countdown may read that one site, and that's the only site it ever contacts.
 
 FROM ME
 Countdown is a one-person project, built and looked after by me. If something's broken or you have an idea, I'd love to hear it: https://github.com/ArjunsProjects/countdown-extension/issues
@@ -91,7 +92,7 @@ The promo tile and marquee use the saturated accent gradient (not white or light
 | Permission | Type | Justification |
 |------------|------|---------------|
 | `sidePanel` | permissions | Countdown's whole interface is a side panel. Clicking the toolbar icon opens it beside the current page so the user can watch their countdowns while browsing. |
-| `storage` | permissions | Saves the user's deadlines, events, repeat rules, categories, completion history and display settings locally on their device (`chrome.storage.local`), so they persist between sessions. Nothing is synced or sent anywhere. |
+| `storage` | permissions | Saves the user's deadlines, events, repeat rules, categories, completion history and display settings locally on their device (`chrome.storage.local`), so they persist between sessions. With the user's sync setting on (default; Appearance → Sync with your other computers), a compact copy of their items, series, categories and settings goes in `chrome.storage.sync`, so Chrome sync carries it to the user's other computers signed in to the same Chrome profile. Nothing is sent to the developer or any other server. |
 | `https://*/*` | optional_host_permissions | Not granted at install. Requested only when the user pastes a calendar link (for example a Google Calendar "Secret address in iCal format") and presses Fetch. Chrome then asks for that one site (and its subdomains, because calendar servers redirect between them, e.g. p52-caldav.icloud.com). The extension downloads that single .ics file, without cookies, to show an import preview. No other request is made to the site and no page content is read. |
 | `alarms` | permissions | Redraws the toolbar icon at the moment its badge or countdown sweep should next change (for example when "3d" becomes "2d"), even while the side panel is closed. No data leaves the device. |
 | `offscreen` | permissions | Extension background scripts can't read whether Chrome is in light or dark mode, so a small hidden page (offscreen reason MATCH_MEDIA) reports it, letting the toolbar icon match the toolbar it sits on. The page does nothing else and makes no network requests. |
@@ -104,7 +105,7 @@ Remote code: none. All JavaScript is bundled in the package; the extension never
 
 **Does the extension collect user data?** No.
 
-The items, categories and settings the user creates are stored only on their device, and the developer never receives them. Calendar links are fetched directly from the calendar server the user chose; nothing is sent to the developer or any third party.
+The items, categories and settings the user creates are stored on their device. With sync on (the default, which users can turn off), they're also stored in `chrome.storage.sync`: Chrome's own sync, in the user's Google account, copied to the user's other computers signed in to the same Chrome profile. That counts as leaving the device, so the privacy policy says so, but it's the user's own Chrome sync; the developer never receives any of it. Calendar links are fetched directly from the calendar server the user chose; nothing is sent to the developer or any third party.
 
 | Data Type | Collected? | Transmitted Off-Device? | Purpose | Shared with Third Parties? |
 |-----------|-----------|------------------------|---------|---------------------------|
@@ -146,6 +147,7 @@ The source is [PRIVACY.md](PRIVACY.md). Keep it consistent with the Privacy & Da
 
 | Version | Date | Changes | Status |
 |---------|------|---------|--------|
+| 1.3.0 | 2026-11-03 | Sync between computers through Chrome sync: lists merge (never overwrite), duplicates are kept once, edits, completions and deletions (with Undo) reach every computer, and repeating series sync as rules. A switch and status in Appearance, and a 30-day restore of each computer's list from before its first sync. Short description no longer says the data stays on the device. Includes 1.2.0 | Draft |
 | 1.2.0 | 2026-11-03 | A calendar: Day, 3 days and Month views in the side panel, and Week in a full tab. Repeating events show every occurrence, categories work as show/hide calendars, and clicking an event shows its details with Complete and Edit. Keyboard shortcuts while the calendar has focus. Includes 1.1.0 | Draft |
 | 1.1.0 | 2026-11-02 | Events can have an end time and a location, set one at a time or for a whole repeating series. While an event is on, its box shows Now and it stays at the top until it ends. Imports keep calendar events' end times and locations, and exports and Google Calendar links carry them. Includes 1.0.1's changes | Draft |
 | 1.0.1 | 2026-10-26 | Fix: a repeating event imported from another time zone that matches yours today but changes its clock rules later (for example Los Angeles vs British Columbia from November 2026) now keeps its source time. Warmer summary. Listing: personal description | Draft |

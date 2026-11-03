@@ -6,6 +6,7 @@ import "../styles/base.css";
 import "../styles/components.css";
 import "../styles/calendar.css";
 import { now, startClock } from "../state/clock";
+import { startSync } from "../state/sync";
 import { addItem, ensureOccurrences, initStore, items, makeRepeating } from "../state/store";
 import { syncTheme } from "../state/theme";
 import { App } from "./App";
@@ -13,6 +14,7 @@ import { App } from "./App";
 await initStore();
 syncTheme();
 startClock();
+void startSync();
 // Keep repeating items topped up as time passes and occurrences complete.
 effect(() => ensureOccurrences(now.value));
 

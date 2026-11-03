@@ -275,6 +275,8 @@ export function topUp(
   series: Series,
   items: readonly Item[],
   now: number,
+  /** Occurrences removed on another computer: never regenerated here. */
+  skip?: ReadonlySet<string>,
 ): { series: Series; added: Item[]; ended: boolean } {
   let upcoming = items.filter(
     (i) => i.seriesId === series.id && !i.completedAt && Date.parse(i.dateTime) > now,
@@ -299,7 +301,7 @@ export function topUp(
       const end = occurrenceEnd(series, date);
       if ((end ?? date).getTime() > now) {
         const id = occurrenceId(series, i);
-        if (!existing.has(id)) {
+        if (!existing.has(id) && !skip?.has(id)) {
           const stamp = toLocalISO(new Date(now));
           const item: Item = {
             id,

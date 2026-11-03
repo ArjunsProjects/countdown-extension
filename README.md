@@ -20,12 +20,13 @@ So I built a simple panel that sits beside whatever I'm working on, pulls in my 
 - **Brings in your calendar:** `.ics` files or Google, Apple and Outlook calendar links, with duplicates spotted for you
 - **Colour-coded categories** for each course, project or trip, with drag and drop
 - **Repeating items,** like weekly homework numbered "Chapter 4, 5, 6…"
+- **Sync across your computers** through Chrome sync, with nothing to sign up for: your lists merge, and nothing is overwritten
 - **A toolbar icon** that shows the time left until your next deadline (switch it off in Appearance if it stresses you out)
 - **Seven colour themes** in light and dark, full keyboard support, and screen reader friendly
 
 ## Your privacy
 
-Everything you add stays in Chrome on your own device. None of it is sent to me or anyone else, and there's no account, server, analytics or tracking. Countdown asks for no access to websites when you install it. If you import a calendar link, Chrome asks whether Countdown may read that one site, and that's the only site it ever contacts. The full policy is in [PRIVACY.md](PRIVACY.md).
+Everything you add is stored in Chrome on your own computer. With sync on (the default), Chrome sync also carries it, through your Google account, to your other computers signed in to the same Chrome profile; turn it off in Appearance. None of it is ever sent to me or anyone else, and there's no account, server, analytics or tracking. Countdown asks for no access to websites when you install it. If you import a calendar link, Chrome asks whether Countdown may read that one site, and that's the only site it ever contacts. The full policy is in [PRIVACY.md](PRIVACY.md).
 
 ## Get Countdown
 
@@ -91,6 +92,7 @@ A quick guide to everything you can do.
 | Export, or act on several at once | **Export** (header) → tick items → Google Calendar, Download .ics, Remove, or **Move to category** (shown once you have categories). |
 | Import | **Import** (header), or drop an `.ics` file anywhere on the panel. Or paste a calendar link and press **Fetch**. Review the preview, optionally choose a **Category** for everything you're adding, then **Add selected**. |
 | Change the look | The palette button at the end of the header opens **Appearance**: **Mode** (System, Light or Dark), **Colour** (seven themes), and **Time left on toolbar icon**. |
+| Sync between computers | On by default: install Countdown on each computer signed in to the same Chrome profile (with Chrome sync on). **Appearance → Sync with your other computers** turns it off on one computer and shows when it last synced. For 30 days after a computer first syncs, **Restore this computer's list from before sync** puts its old list back and turns sync off there. |
 
 **Calendar links:** in Google Calendar, use *Settings › your calendar › Secret address in iCal format*; in Apple Calendar, share the calendar as a Public Calendar and copy its `webcal://` link.
 
@@ -100,7 +102,7 @@ Everything works without a mouse. Tab moves between controls; Enter or Space act
 
 ## Permissions, in detail
 
-Countdown stores everything locally in `chrome.storage.local`; there is no account, server or analytics. It requests `sidePanel`, `storage`, `alarms` (to redraw the toolbar icon on time) and `offscreen` (a hidden page that tells the toolbar icon whether Chrome is in dark mode); none of these shows a warning or prompt at install. When you fetch a calendar link, Chrome asks for permission to read that site (and its subdomains, because calendar servers redirect); nothing else on the web is accessed. Exports are files you download.
+Countdown stores everything locally in `chrome.storage.local`, and with sync on, a compact copy in `chrome.storage.sync`, which Chrome sync carries through the user's Google account; there is no account, server or analytics of its own. It requests `sidePanel`, `storage`, `alarms` (to redraw the toolbar icon on time) and `offscreen` (a hidden page that tells the toolbar icon whether Chrome is in dark mode); none of these shows a warning or prompt at install. When you fetch a calendar link, Chrome asks for permission to read that site (and its subdomains, because calendar servers redirect); nothing else on the web is accessed. Exports are files you download.
 
 ## Development
 
@@ -146,13 +148,14 @@ tests/             Vitest unit tests
 - **Data model:** `Item` (title, type, `dateTime` as ISO with UTC offset, optional all-day, optional `endDateTime` and location for events, notes, source, `seriesId`, completion) and `Series` (rule, end, title template with optional duration and location, numbering, next index to generate, optional source time zone). Ends are exclusive like iCalendar's DTEND, so an all-day event ending on the 12th stores midnight starting the 13th. Completions are also stored as separate records so stats survive removal. `Category` (name, colour from a fixed palette, collapsed) lives in an ordered list; items and series point to one by `categoryId`, and a series passes it on to every occurrence it generates.
 - **Repeating items:** a series keeps its next 6 occurrences generated (deterministic ids), topping up as they are completed or pass. Rules are a subset of RRULE plus hand-picked dates.
 - **Storage:** `chrome.storage.local` with a versioned schema; everything read back is validated. Writes from one action are coalesced into a single write so other open panels never see half a change, and panels never write back in reaction to another panel's change.
+- **Sync** (`src/lib/sync`, `src/state/sync.ts`): local storage stays the full copy; `chrome.storage.sync` holds a replica with one compact key per item, series and category. Each key's content, completion and deletion merge separately by hybrid-logical-clock timestamps; generated occurrences aren't synced (each computer generates the same ones); a missing key is uploaded again rather than read as deleted, because Chrome itself deletes a computer's keys when it first connects to an account that already has data. One open Countdown page runs sync at a time (a Web Lock), so this computer's merges have a single writer. Tests simulate several computers against Chrome's own sync rules, including random use with offline periods.
 - **Themes:** `<html data-palette>` swaps a handful of `--p-*` colours in `tokens.css`; every accent-derived colour is computed from them with `color-mix()`. `src/lib/palettes.ts` holds the same colours for the toolbar icon and the swatches, and a test keeps the two identical.
 - **Toolbar icon:** the service worker redraws it (canvas, 16 and 32px) whenever items, the theme or Chrome's light/dark mode change, and at the time the badge or sweep would next visibly change (`chrome.alarms`). It reads everything from storage on each event, since workers stop when idle.
 - **Floating UI:** popovers, lists and tooltips use the browser's top layer (Popover API), so the glass layering can't hide them.
 
 ### Testing
 
-`npm test` runs 318 unit tests covering countdown math and formatting, date and time parsing, the calendar, recurrence (DST, month ends, leap years), numbering, categories (grouping, order, assignment, undo), events with an end, calendar layout (ranges, repeats beyond the stored ones, overlapping events, the all-day row), `.ics` export and import (round trips, time zones, RRULE mapping, EXDATE and moved occurrences, RFC 5545 line rules), duplicate detection, calendar links, storage validation and backends, the store's actions and undo, multi-panel sync, selection and import. Exported rules are cross-checked by expanding them with ical.js. The suite is run in several time zones (`TZ=Europe/London npm test`, `TZ=Asia/Kolkata npm test`, …) because date bugs hide there.
+`npm test` runs 340 unit tests covering countdown math and formatting, date and time parsing, the calendar, recurrence (DST, month ends, leap years), numbering, categories (grouping, order, assignment, undo), events with an end, calendar layout (ranges, repeats beyond the stored ones, overlapping events, the all-day row), sync (the record format, merge rules, and several simulated computers following Chrome's sync behaviour, including seeded random use), `.ics` export and import (round trips, time zones, RRULE mapping, EXDATE and moved occurrences, RFC 5545 line rules), duplicate detection, calendar links, storage validation and backends, the store's actions and undo, multi-panel sync, selection and import. Exported rules are cross-checked by expanding them with ical.js. The suite is run in several time zones (`TZ=Europe/London npm test`, `TZ=Asia/Kolkata npm test`, …) because date bugs hide there.
 
 Accessibility is checked with axe-core against every main screen in light and dark mode (WCAG 2.2 AA: 0 violations).
 
@@ -166,7 +169,9 @@ Accessibility is checked with axe-core against every main screen in light and da
 ## Known limitations
 
 - Share links would need a server, so they aren't built. Keeping everything on your device matters more to me.
-- Notifications aren't built, and neither is sync across devices yet.
+- Notifications aren't built yet.
+- Sync runs while a Countdown page (the side panel or the calendar tab) is open; changes made on other computers in the meantime arrive as soon as you open it. Chrome gives each extension about 100 KB and 512 entries of sync space, enough for several hundred items; completed items over a year old stay on the computer they're on.
+- When the same item is edited on two computers before they sync, the later edit wins for that item (its completion and deletion are kept separately, so they're never undone by an edit).
 - Calendars are imported once; there is no automatic refresh of a subscribed link.
 - Exotic recurrence rules ("second Tuesday", hourly) import as a fixed stack of their next 6 occurrences.
 
@@ -235,6 +240,12 @@ Accessibility is checked with axe-core against every main screen in light and da
   - One-off times are written in UTC. Repeating series use floating local time, so "10:00 every Monday" stays at 10:00 across daylight-saving changes. Due vs. Starts is kept in an `X-COUNTDOWN-TYPE` property so a later re-import can restore it.
   - A series exports as one repeating event from its next occurrence. Removed occurrences become `EXDATE`s, and moved occurrences become separate events.
   - Month-end rules use the simplest, most widely supported form. The 31st becomes "last day of the month" and 29 February becomes "last day of February", both exact. For the 29th or 30th, other calendars skip months without that day, whereas the app uses the last day.
+- **Sync.** Uses Chrome sync, so it works on every computer signed in to the same Chrome profile with sync on (if Chrome sync is off, Countdown just keeps working on that computer).
+  - **The first time two computers' lists meet,** they're merged, never overwritten: everything from both ends up on both. Things that exist on both under different ids (the same deadline added on each, a category with the same name, an identical repeating series) are kept once; a completion on either copy is kept. Before its first merge, each computer saves a copy of its list for 30 days.
+  - **After that,** a change on one computer reaches the others within seconds. For the same item edited on both before they sync, the later edit wins; completing and deleting are tracked separately, so an edit elsewhere never undoes them. Undo works across computers too. Clocks that are off can't win unfairly (a hybrid logical clock).
+  - **Repeating items** sync as their rule; each computer generates the same occurrences itself. Occurrences you change (complete, move, rename, remove) are synced individually, and a removed occurrence never comes back.
+  - **What syncs:** items, series, categories (name, colour, order) and settings (unit, mode, colour theme, toolbar icon). Which sections are collapsed, the calendar view, and the completion history used for stats stay on each computer.
+  - If a newer Countdown on another computer wrote the account, an older one stops syncing and asks to be updated rather than misread it.
 - **Look and theme.** Surfaces use a frosted-glass material (translucent fill, backdrop blur, bright hairline edge) over a soft fixed gradient. Mode and colour are chosen in **Appearance**; the choice is saved, and the panel cross-fades between looks. Text contrast is checked against the most saturated part of the gradient. With *Reduce transparency* turned on in the OS, surfaces become solid.
 - **Dates.** Dates always display as `Thursday, 29 October 2026, 3:00 PM`; typed dates use MM/DD/YYYY. Times are stored with their UTC offset and exported in UTC.
 - **All-day events.** Items imported as all-day events show no time and count down to the start of that day.

@@ -60,7 +60,14 @@ function virtualItem(s: Series, index: number, date: Date, end: Date | null): It
  * stored were removed (or passed while the panel was closed), so they stay
  * gone. Sorted by start, longer first on ties.
  */
-export function eventsInRange(items: readonly Item[], series: readonly Series[], from: number, to: number): CalEvent[] {
+export function eventsInRange(
+  items: readonly Item[],
+  series: readonly Series[],
+  from: number,
+  to: number,
+  /** Occurrences removed on another computer (sync). */
+  skip?: ReadonlySet<string>,
+): CalEvent[] {
   const out: CalEvent[] = [];
   const stored = new Set<string>();
   for (const item of items) {
@@ -78,7 +85,7 @@ export function eventsInRange(items: readonly Item[], series: readonly Series[],
         const endDate = occurrenceEnd(s, date);
         const start = date.getTime();
         const end = endDate ? endDate.getTime() : start;
-        if (!stored.has(id) && overlaps(start, end, from, to)) {
+        if (!stored.has(id) && !skip?.has(id) && overlaps(start, end, from, to)) {
           out.push({ id, item: virtualItem(s, i, date, endDate), virtual: true, start, end, allDay: Boolean(s.allDay) });
         }
       }

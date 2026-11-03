@@ -12,7 +12,13 @@ Countdown is a Chrome extension that shows live countdowns to your deadlines and
 
 ## How it's stored
 
-Everything above is stored only on your device, in Chrome's extension storage. It is not synced through your Google account and is never sent to the developer. The toolbar icon's countdown and badge are worked out on your device from the same data.
+Everything above is stored on your device, in Chrome's extension storage. The toolbar icon's countdown and badge are worked out on your device from the same data.
+
+## Sync between your computers
+
+Sync is on by default, and you can turn it off on each computer (Appearance → Sync with your other computers). While it's on, your items, repeating series, categories and display settings are also stored in Chrome sync (`chrome.storage.sync`): Chrome keeps that copy in your Google account and gives it to your other computers signed in to the same Chrome profile with Chrome sync on. It is Chrome's own sync, covered by [Google's privacy policy](https://policies.google.com/privacy); it never passes through a server of ours, and the developer never receives it. If Chrome sync is off, or you aren't signed in to Chrome, nothing leaves your computer.
+
+Which sections are collapsed, the calendar view, and the completion history kept for statistics stay on each computer. The first time a computer syncs, Countdown keeps a copy of that computer's list on it for 30 days, so you can restore it.
 
 ## Calendar links
 
@@ -28,7 +34,7 @@ Countdown has no account, server, analytics, advertising or tracking. It does no
 
 ## Deleting your data
 
-Remove items in the panel, or uninstall the extension to delete everything it stored.
+Remove items in the panel (with sync on, they're removed on your other computers too), or uninstall the extension to delete everything it stored on that computer. To delete what's in Chrome sync, remove your items while sync is on, or reset Chrome sync for your Google account at [chrome.google.com/sync](https://chrome.google.com/sync).
 
 ## Changes
 

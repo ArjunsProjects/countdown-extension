@@ -2,11 +2,33 @@ import { useEffect, useId, useRef, useState } from "preact/hooks";
 import { PALETTES, paletteById, type Palette, type PaletteId } from "../lib/palettes";
 import type { Theme } from "../lib/storage";
 import { prefs, setPrefs } from "../state/store";
+import { backupAt, restoreBackup, setSyncEnabled, syncEnabled, syncStatus, syncSupported } from "../state/sync";
 import { setAppearance, shownAppearance, systemDark, THEME_LABEL } from "../state/theme";
 import { Icon } from "./Icon";
 import { Popover } from "./Popover";
 
 const THEMES: Theme[] = ["system", "light", "dark"];
+
+const clockTime = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" });
+
+/** What sync is doing, in a line. */
+function syncHint(): string {
+  if (!syncSupported) return "Sync works in the installed extension.";
+  if (!syncEnabled.value) return "Off. This computer's list stays here.";
+  const { state, at } = syncStatus.value;
+  switch (state) {
+    case "update":
+      return "Another computer has a newer Countdown. Update it here to keep syncing.";
+    case "full":
+      return "Chrome's sync space is full, so older completed items stay on this computer.";
+    case "error":
+      return "Couldn't sync just now. It'll try again.";
+    case "syncing":
+      return "Syncing…";
+    default:
+      return `Through Chrome sync, to computers signed in to the same Chrome profile.${at ? ` Up to date as of ${clockTime.format(at)}.` : ""}`;
+  }
+}
 
 /**
  * A palette's swatch in the current scheme: its gradient with a check in the
@@ -148,6 +170,30 @@ export function AppearanceMenu() {
                 ? "The icon's sweep shrinks as your next item gets closer, with a short badge like 3d."
                 : "The icon stays still, with no badge."}
             </p>
+          </div>
+
+          <div class="appearance__group appearance__switch-row">
+            <label class="appearance__switch-label" for={`${id}-sync`}>
+              Sync with your other computers
+            </label>
+            <input
+              id={`${id}-sync`}
+              type="checkbox"
+              role="switch"
+              class="switch"
+              aria-describedby={`${id}-sync-hint`}
+              checked={syncSupported && syncEnabled.value}
+              disabled={!syncSupported}
+              onChange={(e) => setSyncEnabled(e.currentTarget.checked)}
+            />
+            <p id={`${id}-sync-hint`} class="field-hint" aria-live="polite">
+              {syncHint()}
+            </p>
+            {syncSupported && backupAt.value !== null && (
+              <button type="button" class="button button--quiet appearance__restore" onClick={() => void restoreBackup()}>
+                Restore this computer's list from before sync
+              </button>
+            )}
           </div>
         </Popover>
       )}
