@@ -7,7 +7,7 @@ Countdown is a Chrome extension that shows live countdowns to your deadlines and
 ## What data Countdown handles
 
 - **Your items:** the titles, dates, start and end times, locations, notes, repeat rules and categories you enter, and when you completed items.
-- **Your settings:** the countdown unit, light/dark mode and colour theme you chose, whether the toolbar icon shows the time left, which sections are collapsed, and the calendar view and categories you chose to show.
+- **Your settings:** the countdown unit, light/dark mode and colour theme you chose, whether the toolbar icon shows the time left, when you'd like reminders, which sections are collapsed, and the calendar view and categories you chose to show.
 - **Calendars you import:** events from .ics files you choose or calendar links you paste.
 
 ## How it's stored
@@ -19,6 +19,10 @@ Everything above is stored on your device, in Chrome's extension storage. The to
 Sync is on by default, and you can turn it off on each computer (Appearance → Sync with your other computers). While it's on, your items, repeating series, categories and display settings are also stored in Chrome sync (`chrome.storage.sync`): Chrome keeps that copy in your Google account and gives it to your other computers signed in to the same Chrome profile with Chrome sync on. It is Chrome's own sync, covered by [Google's privacy policy](https://policies.google.com/privacy); it never passes through a server of ours, and the developer never receives it. If Chrome sync is off, or you aren't signed in to Chrome, nothing leaves your computer.
 
 Which sections are collapsed, the calendar view, and the completion history kept for statistics stay on each computer. The first time a computer syncs, Countdown keeps a copy of that computer's list on it for 30 days, so you can restore it.
+
+## Reminders
+
+Reminders are off until you turn them on (Appearance → Reminders). Chrome then asks whether Countdown may show notifications. Reminders are worked out on your computer from your own items and shown by Chrome there; nothing about them is sent anywhere. Turning reminders off in Countdown gives the permission back, and you can also block Chrome's notifications in your computer's settings.
 
 ## Calendar links
 

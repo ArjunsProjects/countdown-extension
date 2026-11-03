@@ -3,6 +3,7 @@ import { toLocalISO } from "../dates";
 import { endOf } from "../events";
 import { PALETTE_IDS, type PaletteId } from "../palettes";
 import { occurrenceAt, occurrenceEnd, occurrenceTitle, type Series } from "../recurrence";
+import { cleanReminders } from "../reminders";
 import { DEFAULT_PREFS, type Prefs, type Theme } from "../storage";
 import type { Item, Unit } from "../types";
 
@@ -169,7 +170,7 @@ export function decodeCategory(id: string, c: Content, collapsed: boolean | unde
 
 /** The settings that follow you between computers (collapsed sections don't). */
 export function encodePrefs(p: Prefs): Content {
-  return { u: p.unit, th: p.theme, p: p.palette, li: p.liveIcon ? 1 : 0 };
+  return { u: p.unit, th: p.theme, p: p.palette, li: p.liveIcon ? 1 : 0, rd: [p.reminders.due, p.reminders.starts] };
 }
 
 const UNITS = new Set<string>(["days", "hours", "minutes", "seconds"]);
@@ -182,6 +183,10 @@ export function decodePrefs(c: Content, local: Prefs): Prefs {
     theme: isStr(c.th) && THEMES.has(c.th) ? (c.th as Theme) : DEFAULT_PREFS.theme,
     palette: isStr(c.p) && PALETTE_IDS.has(c.p) ? (c.p as PaletteId) : DEFAULT_PREFS.palette,
     liveIcon: c.li !== 0,
+    // Default reminders, from 1.5.0. An older version's settings leave this computer's as they are.
+    reminders: Array.isArray(c.rd)
+      ? { due: cleanReminders(c.rd[0]) ?? local.reminders.due, starts: cleanReminders(c.rd[1]) ?? local.reminders.starts }
+      : local.reminders,
   };
 }
 
@@ -226,7 +231,7 @@ export function derivedOccurrence(s: Series, index: number, stamp: string): Item
  * (or the first one imported), which generation never creates.
  */
 export function isDerived(item: Item, seriesById: ReadonlyMap<string, Series>): boolean {
-  if (!item.seriesId || item.completedAt || item.customTitle) return false;
+  if (!item.seriesId || item.completedAt || item.customTitle || item.reminders !== undefined) return false;
   const s = seriesById.get(item.seriesId);
   const parts = parseOccurrenceId(item.id);
   if (!s || !parts || parts.index === 0 || parts.seriesId !== s.id || parts.epoch !== s.epoch) return false;

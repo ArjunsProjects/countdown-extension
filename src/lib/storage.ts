@@ -1,6 +1,7 @@
 import { MAX_CUSTOM_DATES, type RepeatEnd, type RepeatRule, type Series } from "./recurrence";
 import { CATEGORY_COLORS, MAX_CATEGORY_NAME, type Category } from "./categories";
 import { DEFAULT_PALETTE, PALETTE_IDS, type PaletteId } from "./palettes";
+import { DEFAULT_REMINDERS, parseReminderDefaults, type ReminderDefaults } from "./reminders";
 import { isValidTimeZone } from "./timezone";
 import type { CompletionRecord, Item, Unit } from "./types";
 
@@ -17,6 +18,8 @@ export interface Prefs {
   liveIcon: boolean;
   overdueCollapsed: boolean;
   completedCollapsed: boolean;
+  /** Reminders for deadlines and events that don't set their own. */
+  reminders: ReminderDefaults;
 }
 
 export const DEFAULT_PREFS: Prefs = {
@@ -26,6 +29,7 @@ export const DEFAULT_PREFS: Prefs = {
   liveIcon: true,
   overdueCollapsed: false,
   completedCollapsed: true,
+  reminders: DEFAULT_REMINDERS,
 };
 
 export interface StoredState {
@@ -153,6 +157,7 @@ export function parsePrefs(v: unknown): Prefs {
     // Before the Overdue/Completed split, the single bottom section was "pastCollapsed".
     overdueCollapsed: bool(o.overdueCollapsed, bool(o.pastCollapsed, DEFAULT_PREFS.overdueCollapsed)),
     completedCollapsed: bool(o.completedCollapsed, DEFAULT_PREFS.completedCollapsed),
+    reminders: parseReminderDefaults(o.reminders),
   };
 }
 

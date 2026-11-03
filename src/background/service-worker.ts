@@ -1,7 +1,9 @@
 import { drawSweepIcon } from "../lib/drawIcon";
 import { paletteById } from "../lib/palettes";
 import { parseItems, parsePrefs } from "../lib/storage";
+import { REMINDER_DONE_KEY, REMINDER_DONE_SEEN_KEY } from "../lib/reminders";
 import { iconState } from "../lib/toolbarIcon";
+import { checkReminders, listen, REMINDER_ALARM, remindersAllowed, remindersRemoved } from "./reminders";
 
 // Service workers stop when idle, so nothing lives in variables: every event
 // reads what it needs from storage, and the redraw time is an alarm.
@@ -43,15 +45,18 @@ async function ensureSchemeWatcher() {
 /** Redraws the toolbar icon from what's stored, and schedules the next redraw. */
 async function refreshIcon() {
   const [local, session] = await Promise.all([
-    chrome.storage.local.get(["items", "prefs"]),
+    chrome.storage.local.get(["items", "prefs", REMINDER_DONE_KEY]),
     chrome.storage.session.get(TOOLBAR_DARK),
   ]);
+  // Marked done from a reminder: done, even before a page applies it.
+  const done = new Set(Object.keys((local[REMINDER_DONE_KEY] as object | undefined) ?? {}));
   const prefs = parsePrefs(local.prefs);
   const palette = paletteById(prefs.palette);
   const dark = session[TOOLBAR_DARK] === true;
   const mode = dark ? palette.dark : palette.light;
   const now = Date.now();
-  const state = iconState(parseItems(local.items), now, prefs.liveIcon);
+  const items = parseItems(local.items).map((i) => (done.has(i.id) && !i.completedAt ? { ...i, completedAt: new Date(now).toISOString() } : i));
+  const state = iconState(items, now, prefs.liveIcon);
 
   const imageData: Record<string, ImageData> = {};
   for (const size of [16, 32]) {
@@ -100,20 +105,37 @@ const start = () => {
   openOnClick();
   ensureSchemeWatcher();
   scheduleRefresh();
+  // Includes reminders missed while Chrome was closed, for things still to come.
+  checkReminders();
 };
+
+listen();
 
 chrome.runtime.onInstalled.addListener(start);
 chrome.runtime.onStartup.addListener(start);
 
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === ALARM) scheduleRefresh();
+  if (alarm.name === REMINDER_ALARM) checkReminders();
+});
+
+// Reminders are switched on and off by granting or removing the notifications permission.
+chrome.permissions.onAdded.addListener((p) => {
+  if (p.permissions?.includes("notifications")) remindersAllowed();
+});
+chrome.permissions.onRemoved.addListener((p) => {
+  if (p.permissions?.includes("notifications")) remindersRemoved();
 });
 
 // Items, theme or the live-icon setting changed (from any panel), or the toolbar's scheme did.
+// Reminders also follow series and other computers' changes as they arrive.
 chrome.storage.onChanged.addListener((changes, area) => {
-  if ((area === "local" && ("items" in changes || "prefs" in changes)) || (area === "session" && TOOLBAR_DARK in changes)) {
+  const local = area === "local";
+  if ((local && ("items" in changes || "prefs" in changes || REMINDER_DONE_KEY in changes)) || (area === "session" && TOOLBAR_DARK in changes)) {
     scheduleRefresh();
   }
+  const listChanged = ["items", "series", "prefs", "syncEnabled", REMINDER_DONE_KEY, REMINDER_DONE_SEEN_KEY].some((k) => k in changes);
+  if ((local && listChanged) || area === "sync") checkReminders();
 });
 
 chrome.runtime.onMessage.addListener((message: unknown) => {

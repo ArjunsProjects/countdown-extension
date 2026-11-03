@@ -3,7 +3,7 @@
 // and drives the service worker, the offscreen page and the toolbar icon.
 // Run with `npm run check:extension` after a build. Exits non-zero on failure.
 import { spawn } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -11,6 +11,7 @@ const ROOT = new URL("../", import.meta.url).pathname;
 const DIST = join(ROOT, "dist");
 const expected = JSON.parse(readFileSync(join(ROOT, "public/manifest.json"), "utf8"));
 const profile = mkdtempSync(join(tmpdir(), "countdown-check-"));
+const granted = mkdtempSync(join(tmpdir(), "countdown-granted-"));
 const chrome = spawn(process.env.CHROME ?? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
   ["--headless=new", "--disable-gpu", `--user-data-dir=${profile}`, "--remote-debugging-pipe", "--enable-unsafe-extension-debugging", "about:blank"],
   { stdio: ["ignore", "ignore", "ignore", "pipe", "pipe"] });
@@ -92,8 +93,37 @@ try {
   s = await state();
   check("live icon off: no badge, no alarm", s.badge === "" && s.alarm === null);
 
+  // Reminders: off until Chrome allows notifications, which is optional, so never at install.
+  const off = await run(swS, `return { allowed: await chrome.permissions.contains({ permissions: ["notifications"] }),
+    optional: chrome.runtime.getManifest().optional_permissions ?? [], alarm: (await chrome.alarms.get("reminders")) ?? null }`);
+  check("reminders off until notifications are allowed", !off.allowed && off.optional.includes("notifications") && off.alarm === null, off.optional.join(" "));
+
+  // A copy with the permission already given (headless Chrome can't click Allow) shows a real reminder.
+  cpSync(DIST, granted, { recursive: true });
+  const m = JSON.parse(readFileSync(join(granted, "manifest.json"), "utf8"));
+  m.permissions.push("notifications");
+  delete m.optional_permissions;
+  writeFileSync(join(granted, "manifest.json"), JSON.stringify(m));
+  const { id: grantedId } = await send("Extensions.loadUnpacked", { path: granted });
+  await sleep(1500);
+  const sw2 = (await send("Target.getTargets")).targetInfos.find((t) => t.url.includes(grantedId) && t.url.includes("service-worker.js"));
+  const sw2S = await attach(sw2);
+  await send("Runtime.enable", {}, sw2S);
+  const goesOff = Date.now() + 4000;
+  await run(sw2S, `await chrome.storage.local.set({ items: [{ id: "r", title: "Lab report", type: "due", dateTime: new Date(${goesOff + 3600e3}).toISOString(),
+    reminders: [60], createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z", source: "manual" }] })`);
+  await sleep(700);
+  const alarmAt = await run(sw2S, `return (await chrome.alarms.get("reminders"))?.scheduledTime ?? null`);
+  check("reminder alarm set for an hour before", alarmAt !== null && Math.abs(alarmAt - goesOff) < 1500, alarmAt && `in ${Math.round((alarmAt - Date.now()) / 1000)} s`);
+  let notes = [];
+  for (let waited = 0; waited < 45_000 && !notes.includes("reminder:r"); waited += 1000) {
+    await sleep(1000);
+    notes = await run(sw2S, `return Object.keys(await chrome.notifications.getAll())`);
+  }
+  check("reminder shows as a notification", notes.includes("reminder:r"), notes.join(" ") || "none");
+
   const errors = events.filter((e) => e.method === "Runtime.exceptionThrown" || (e.method === "Runtime.consoleAPICalled" && e.params.type === "error"));
-  check("no errors in the worker", errors.length === 0, errors.map((e) => JSON.stringify(e.params).slice(0, 160)).join(" | "));
+  check("no errors in the workers", errors.length === 0, errors.map((e) => JSON.stringify(e.params).slice(0, 160)).join(" | "));
 } catch (error) {
   results.push({ ok: false, line: `ERROR  ${error.message}` });
 } finally {
@@ -102,5 +132,6 @@ try {
   chrome.kill();
   await exited;
   rmSync(profile, { recursive: true, force: true, maxRetries: 3 });
+  rmSync(granted, { recursive: true, force: true, maxRetries: 3 });
   if (results.some((r) => !r.ok)) process.exitCode = 1;
 }

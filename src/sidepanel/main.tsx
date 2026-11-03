@@ -6,6 +6,7 @@ import "../styles/base.css";
 import "../styles/components.css";
 import "../styles/calendar.css";
 import { now, startClock } from "../state/clock";
+import { startReminders } from "../state/reminders";
 import { startSync } from "../state/sync";
 import { addItem, ensureOccurrences, initStore, items, makeRepeating } from "../state/store";
 import { syncTheme } from "../state/theme";
@@ -17,6 +18,7 @@ startClock();
 void startSync();
 // Keep repeating items topped up as time passes and occurrences complete.
 effect(() => ensureOccurrences(now.value));
+void startReminders();
 
 // Development builds only: open the panel with ?seed to load sample data into an empty list.
 if (import.meta.env.MODE === "development" && new URLSearchParams(location.search).has("seed") && items.value.length === 0) {

@@ -7,7 +7,7 @@ import type { Item, Unit } from "../lib/types";
 import { fromYmd, nextMatchingDay, toYmd } from "../lib/calendar";
 import { hasNumberToken, renderTitle } from "../lib/numbering";
 import { occurrenceIndex, occurrenceTitle, presetOf, type Series } from "../lib/recurrence";
-import { addItem, assignCategory, changeSeriesRule, makeRepeating, removeItems, saveItem, saveSeries, series } from "../state/store";
+import { addItem, assignCategory, changeSeriesRule, makeRepeating, prefs, removeItems, saveItem, saveSeries, series, setSeriesReminders } from "../state/store";
 import { COMPLETE_MS, editing, focusTile, neighbourOf, prefersReducedMotion, startCompletion } from "../state/ui";
 import { CountdownBox } from "./CountdownBox";
 import { SelectCell } from "./SelectCell";
@@ -17,6 +17,7 @@ import { NO_REPEAT, RepeatField, ruleOf, sameRepeat, type RepeatValue } from "./
 import { Icon } from "./Icon";
 import { IconButton } from "./IconButton";
 import { OccurrencePreview } from "./OccurrencePreview";
+import { ReminderField } from "./ReminderField";
 import { TitleNumbering } from "./TitleNumbering";
 import { TimeField } from "./TimeField";
 import { TypeToggle } from "./TypeToggle";
@@ -88,6 +89,11 @@ export function EditorRow({ item, isNew, unit, now }: Props) {
   const latestCategory = useRef(categoryId);
   latestCategory.current = categoryId;
   const onlyThis = inSeries && scope === "one";
+  // An occurrence's reminders are its series'.
+  const [initialReminders] = useState(() => (inSeries ? owner!.template.reminders : item.reminders));
+  const [reminders, setReminders] = useState(initialReminders);
+  const latestReminders = useRef(reminders);
+  latestReminders.current = reminders;
   const ref = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLInputElement>(null);
   const latest = useRef(fields);
@@ -137,10 +143,18 @@ export function EditorRow({ item, isNew, unit, now }: Props) {
       else delete next.categoryId;
       return next;
     };
+    const rem = latestReminders.current;
+    const remindersChanged = JSON.stringify(rem) !== JSON.stringify(initialReminders);
+    const withReminders = <T extends Item>(x: T): T => {
+      const next = { ...x };
+      if (rem) next.reminders = rem;
+      else delete next.reminders;
+      return next;
+    };
 
     if (isNew) {
       if (!raw) return null;
-      let created = withCategory(withFields(item, { ...f, title: firstTitle }, stamp));
+      let created = withReminders(withCategory(withFields(item, { ...f, title: firstTitle }, stamp)));
       if (rule) created = makeRepeating(created, rule, r.end, title);
       addItem(created);
       return created;
@@ -148,9 +162,9 @@ export function EditorRow({ item, isNew, unit, now }: Props) {
 
     const categoryChanged = (item.categoryId ?? null) !== cat;
     if (!item.seriesId || !owner) {
-      let next = withCategory(withFields(item, { ...f, title: raw ? firstTitle : item.title }, stamp));
+      let next = withReminders(withCategory(withFields(item, { ...f, title: raw ? firstTitle : item.title }, stamp)));
       if (rule && !item.seriesId) next = makeRepeating(next, rule, r.end, title);
-      if (rule || differs(item, next) || categoryChanged) saveItem(next);
+      if (rule || differs(item, next) || categoryChanged || remindersChanged) saveItem(next);
       return next;
     }
 
@@ -172,13 +186,16 @@ export function EditorRow({ item, isNew, unit, now }: Props) {
       changeSeriesRule(item.seriesId, next, rule, r.end, stamp, { template, numberFrom: from + index });
       if (!rule) {
         const { seriesId: _, ...single } = next;
+        // A one-off now, so the reminders are its own.
+        if (remindersChanged) saveItem(withReminders(single));
         return single;
       }
     } else if (template !== owner.template.title || next.type !== owner.template.type || (numbered && from !== owner.numberFrom)) {
       saveSeries(item.seriesId, { title: template, type: next.type, numberFrom: from });
     }
-    // A category belongs to the whole series.
+    // A category belongs to the whole series, and so do reminders.
     if (categoryChanged && rule) assignCategory({ kind: "series", id: item.seriesId }, cat, true);
+    if (remindersChanged) setSeriesReminders(item.seriesId, rem);
     return next;
   };
 
@@ -293,6 +310,15 @@ export function EditorRow({ item, isNew, unit, now }: Props) {
             numberFrom={numberFrom}
           />
         )}
+
+        <ReminderField
+          value={reminders}
+          onChange={setReminders}
+          item={{ type: fields.type, allDay: !fields.time }}
+          fallback={prefs.value.reminders[fields.type]}
+          label={inSeries ? "Remind me, for every occurrence" : "Remind me"}
+          offerTurnOn
+        />
 
         <div class="field-button field-button--input editor__location">
           <Icon name="pin" />

@@ -21,12 +21,13 @@ So I built a simple panel that sits beside whatever I'm working on, pulls in my 
 - **Colour-coded categories** for each course, project or trip, with drag and drop
 - **Repeating items,** like weekly homework numbered "Chapter 4, 5, 6…"
 - **Sync across your computers** through Chrome sync, with nothing to sign up for: your lists merge, and nothing is overwritten
+- **Reminders** before deadlines and events, even with the side panel closed, with **Mark done** and **Snooze** right in the notification
 - **A toolbar icon** that shows the time left until your next deadline (switch it off in Appearance if it stresses you out)
 - **Seven colour themes** in light and dark, full keyboard support, and screen reader friendly
 
 ## Your privacy
 
-Everything you add is stored in Chrome on your own computer. With sync on (the default), Chrome sync also carries it, through your Google account, to your other computers signed in to the same Chrome profile; turn it off in Appearance. None of it is ever sent to me or anyone else, and there's no account, server, analytics or tracking. Countdown asks for no access to websites when you install it. If you import a calendar link, Chrome asks whether Countdown may read that one site, and that's the only site it ever contacts. The full policy is in [PRIVACY.md](PRIVACY.md).
+Everything you add is stored in Chrome on your own computer. With sync on (the default), Chrome sync also carries it, through your Google account, to your other computers signed in to the same Chrome profile; turn it off in Appearance. None of it is ever sent to me or anyone else, and there's no account, server, analytics or tracking. Countdown asks for no access to websites when you install it. If you turn on reminders, Chrome asks whether Countdown may show notifications; they're worked out and shown on your computer. If you import a calendar link, Chrome asks whether Countdown may read that one site, and that's the only site it ever contacts. The full policy is in [PRIVACY.md](PRIVACY.md).
 
 ## Get Countdown
 
@@ -94,6 +95,7 @@ A quick guide to everything you can do.
 | Import | **Import** (header), or drop an `.ics` file anywhere on the panel. Or paste a calendar link and press **Fetch**. Review the preview, optionally choose a **Category** for everything you're adding, then **Add selected**. |
 | Change the look | The palette button at the end of the header opens **Appearance**: **Mode** (System, Light or Dark), **Colour** (seven themes), and **Time left on toolbar icon**. |
 | Sync between computers | On by default: install Countdown on each computer signed in to the same Chrome profile (with Chrome sync on). **Appearance → Sync with your other computers** turns it off on one computer and shows when it last synced. For 30 days after a computer first syncs, **Restore this computer's list from before sync** puts its old list back and turns sync off there. |
+| Get reminders | **Appearance → Reminders** turns them on for that computer (Chrome asks once to allow notifications). By default deadlines remind you 1 day and 1 hour before, and events 15 minutes before; change that under the switch. In an item's editor, **Remind me** picks another time, a second one, or none, for that item, or in a repeating stack for every occurrence. A reminder has **Mark done** and **Snooze 10 min**, and clicking it opens Countdown. |
 
 **Calendar links:** in Google Calendar, use *Settings › your calendar › Secret address in iCal format*; in Apple Calendar, share the calendar as a Public Calendar and copy its `webcal://` link.
 
@@ -103,7 +105,7 @@ Everything works without a mouse. Tab moves between controls; Enter or Space act
 
 ## Permissions, in detail
 
-Countdown stores everything locally in `chrome.storage.local`, and with sync on, a compact copy in `chrome.storage.sync`, which Chrome sync carries through the user's Google account; there is no account, server or analytics of its own. It requests `sidePanel`, `storage`, `alarms` (to redraw the toolbar icon on time) and `offscreen` (a hidden page that tells the toolbar icon whether Chrome is in dark mode); none of these shows a warning or prompt at install. When you fetch a calendar link, Chrome asks for permission to read that site (and its subdomains, because calendar servers redirect); nothing else on the web is accessed. Exports are files you download.
+Countdown stores everything locally in `chrome.storage.local`, and with sync on, a compact copy in `chrome.storage.sync`, which Chrome sync carries through the user's Google account; there is no account, server or analytics of its own. It requests `sidePanel`, `storage`, `alarms` (to redraw the toolbar icon on time) and `offscreen` (a hidden page that tells the toolbar icon whether Chrome is in dark mode); none of these shows a warning or prompt at install. When you fetch a calendar link, Chrome asks for permission to read that site (and its subdomains, because calendar servers redirect); nothing else on the web is accessed. When you turn on reminders, Chrome asks whether Countdown may show notifications (`notifications`, also optional, so installing and updating never ask for it); turning them off gives the permission back. Exports are files you download.
 
 ## Development
 
@@ -127,14 +129,15 @@ Countdown stores everything locally in `chrome.storage.local`, and with sync on,
 
 ```
 public/            manifest.json and icons (copied to dist/ as-is)
-src/background/    MV3 service worker: opens the side panel and draws the toolbar icon
+src/background/    MV3 service worker: opens the side panel, draws the toolbar icon
+                   and shows reminders
 src/offscreen/     hidden page that reports Chrome's light/dark mode to the worker
 src/sidepanel/     panel page, entry point and root component
 src/components/    UI components (Preact)
 src/hooks/         shared hooks: dismissal, presence animations, sheet height
 src/lib/           pure logic, unit-tested: dates, parsing, calendar, countdowns,
                    recurrence, numbering, categories, calendar layout
-                   and editing, time zones,
+                   and editing, reminders, time zones,
                    .ics import/export, duplicate detection, storage
                    validation, positioning, palettes, toolbar icon
 src/state/         signals and actions: items, series, categories, prefs,
@@ -146,7 +149,7 @@ tests/             Vitest unit tests
 ### How it fits together
 
 - **UI:** Preact components with `@preact/signals` for state. Components read signals directly, so only what changed re-renders.
-- **Data model:** `Item` (title, type, `dateTime` as ISO with UTC offset, optional all-day, optional `endDateTime` and location for events, notes, source, `seriesId`, completion) and `Series` (rule, end, title template with optional duration and location, numbering, next index to generate, optional source time zone). Ends are exclusive like iCalendar's DTEND, so an all-day event ending on the 12th stores midnight starting the 13th. Completions are also stored as separate records so stats survive removal. `Category` (name, colour from a fixed palette, collapsed) lives in an ordered list; items and series point to one by `categoryId`, and a series passes it on to every occurrence it generates.
+- **Data model:** `Item` (title, type, `dateTime` as ISO with UTC offset, optional all-day, optional `endDateTime` and location for events, notes, source, `seriesId`, completion, optional reminders) and `Series` (rule, end, title template with optional duration, location and reminders, numbering, next index to generate, optional source time zone). Ends are exclusive like iCalendar's DTEND, so an all-day event ending on the 12th stores midnight starting the 13th. Completions are also stored as separate records so stats survive removal. `Category` (name, colour from a fixed palette, collapsed) lives in an ordered list; items and series point to one by `categoryId`, and a series passes it on to every occurrence it generates.
 - **Repeating items:** a series keeps its next 6 occurrences generated (deterministic ids), topping up as they are completed or pass. Rules are a subset of RRULE plus hand-picked dates.
 - **Storage:** `chrome.storage.local` with a versioned schema; everything read back is validated. Writes from one action are coalesced into a single write so other open panels never see half a change, and panels never write back in reaction to another panel's change.
 - **Sync** (`src/lib/sync`, `src/state/sync.ts`): local storage stays the full copy; `chrome.storage.sync` holds a replica with one compact key per item, series and category. Each key's content, completion and deletion merge separately by hybrid-logical-clock timestamps; generated occurrences aren't synced (each computer generates the same ones); a missing key is uploaded again rather than read as deleted, because Chrome itself deletes a computer's keys when it first connects to an account that already has data. One open Countdown page runs sync at a time (a Web Lock), so this computer's merges have a single writer. Tests simulate several computers against Chrome's own sync rules, including random use with offline periods.
@@ -156,7 +159,7 @@ tests/             Vitest unit tests
 
 ### Testing
 
-`npm test` runs 350 unit tests covering countdown math and formatting, date and time parsing, the calendar, recurrence (DST, month ends, leap years), numbering, categories (grouping, order, assignment, undo), events with an end, calendar layout (ranges, repeats beyond the stored ones, overlapping events, the all-day row), editing on the calendar (moves, new ends, new events from a click or a drag, across a daylight-saving change, with Undo), sync (the record format, merge rules, and several simulated computers following Chrome's sync behaviour, including seeded random use), `.ics` export and import (round trips, time zones, RRULE mapping, EXDATE and moved occurrences, RFC 5545 line rules), duplicate detection, calendar links, storage validation and backends, the store's actions and undo, multi-panel sync, selection and import. Exported rules are cross-checked by expanding them with ical.js. The suite is run in several time zones (`TZ=Europe/London npm test`, `TZ=Asia/Kolkata npm test`, …) because date bugs hide there.
+`npm test` runs 372 unit tests covering countdown math and formatting, date and time parsing, the calendar, recurrence (DST, month ends, leap years), numbering, categories (grouping, order, assignment, undo), events with an end, calendar layout (ranges, repeats beyond the stored ones, overlapping events, the all-day row), editing on the calendar (moves, new ends, new events from a click or a drag, across a daylight-saving change, with Undo), reminders (when they go off across daylight saving and on all-day items, what's due between checks, snooze, Mark done applied once, the service worker against a stubbed Chrome), sync (the record format, merge rules, and several simulated computers following Chrome's sync behaviour, including seeded random use), `.ics` export and import (round trips, time zones, RRULE mapping, EXDATE and moved occurrences, RFC 5545 line rules), duplicate detection, calendar links, storage validation and backends, the store's actions and undo, multi-panel sync, selection and import. Exported rules are cross-checked by expanding them with ical.js. The suite is run in several time zones (`TZ=Europe/London npm test`, `TZ=Asia/Kolkata npm test`, …) because date bugs hide there.
 
 Accessibility is checked with axe-core against every main screen in light and dark mode (WCAG 2.2 AA: 0 violations).
 
@@ -170,7 +173,7 @@ Accessibility is checked with axe-core against every main screen in light and da
 ## Known limitations
 
 - Share links would need a server, so they aren't built. Keeping everything on your device matters more to me.
-- Notifications aren't built yet.
+- Reminders come from Chrome, so they appear only while Chrome is running; one missed while it was closed shows when Chrome starts, if its item is still to come. Your computer's notification settings must allow Chrome, and Countdown can't tell if they don't.
 - Sync runs while a Countdown page (the side panel or the calendar tab) is open; changes made on other computers in the meantime arrive as soon as you open it. Chrome gives each extension about 100 KB and 512 entries of sync space, enough for several hundred items; completed items over a year old stay on the computer they're on.
 - When the same item is edited on two computers before they sync, the later edit wins for that item (its completion and deletion are kept separately, so they're never undone by an edit).
 - Calendars are imported once; there is no automatic refresh of a subscribed link.
@@ -192,6 +195,12 @@ Accessibility is checked with axe-core against every main screen in light and da
   - **Changing it on the grid:** a click on empty time makes an hour from the 15-minute slot clicked; a drag covers the slots it crosses, within that day. The quick-create popover makes a **Starts** event by default (switch to **Due** for a deadline) and picks no category, or the first one shown if items without a category are hidden on the calendar. Escape or a click elsewhere discards it; clicking another empty slot moves it there.
   - **Moving:** an event keeps its length, and its start snaps to 15 minutes by the wall clock, so 9:00 stays 9:00 across a daylight-saving change. A sideways drag that hasn't gone a whole step up or down keeps the time of day. The bottom edge can be dragged into the next days, but never above 15 minutes after the start. A drag scrolls the grid when it nears the top or bottom, and Escape cancels it.
   - **Repeating events:** moving one occurrence changes only that one, as editing its time does; a later occurrence the series hasn't stored yet is stored with its new time (Undo takes it back).
+- **Reminders.** Off until you turn them on in Appearance, on each computer: Chrome asks to allow notifications, and turning them off gives that back.
+  - **Which apply:** an item's own (**Remind me** in its editor), else its series', else the defaults for its type. Up to two each, like Apple Calendar's alerts.
+  - **When they go off:** minutes before a timed item; whole days keep the clock time across a daylight-saving change. All-day items remind at 9 AM, and an all-day deadline (due as its day begins) the day before at the latest.
+  - **Late or missed:** one at the item's own time can come up to 5 minutes late; one missed while Chrome was closed shows when it starts, if its item is still to come. Several missed at once give one notification per item, and more than three are summed up in one more. A reminder whose time had already passed when its item was made, moved or changed doesn't go off late.
+  - **In the notification:** the time left and when ("Due in 1 hour · 11:59 PM", "Starts in 15 minutes · 12:30–2 PM · Swing Space"). **Mark done** completes the item: straight away in an open Countdown page, otherwise as soon as one opens (nothing reminds you of it meanwhile, and the toolbar icon moves on). **Snooze 10 min** brings it back once. Completing or removing an item takes its notification away.
+  - **Across computers:** the choices and defaults sync; whether reminders are on doesn't. Each computer works them out from what's synced too, so something completed or moved on another computer doesn't remind you here, even before Countdown opens here. Repeating series keep reminding while Countdown stays closed.
 - **Events with an end.** A **Starts** item can have an end and a location. It counts down to its start, then its box shows **Now** (filled with the accent, or its category's colour) and stays at the top of the list until it ends, with the time left until the end in the tooltip. After that it moves to the bottom section as **Ended**. Events without an end still move there as **Started** the moment they begin. An all-day event lasts its whole day unless it has its own end date. Deadlines are always a single moment.
 - **Categories.** With no categories the panel is one list, as before. Once you add one, the upcoming list splits into sections in your chosen order, each sorted soonest first, with uncategorised items under **Other** at the end. Overdue and Completed stay as single lists across all categories, with each row keeping its category's colour.
   - A category colours its rows' countdown boxes and adds a stripe to each tile. The eight colours are tuned so every one meets WCAG AA in both themes; there's no free colour picker because arbitrary colours can't guarantee that.

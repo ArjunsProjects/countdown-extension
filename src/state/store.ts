@@ -149,6 +149,40 @@ export function rescheduleItem(target: Item, patch: { dateTime: string; endDateT
   });
 }
 
+/**
+ * Sets the reminders for every occurrence of a series, including ones
+ * generated later (undefined: the defaults). A stack without a stored rule
+ * gets them on each upcoming occurrence instead.
+ */
+export function setSeriesReminders(seriesId: string, reminders: number[] | undefined, now = new Date()) {
+  const s = series.value.find((x) => x.id === seriesId);
+  const t = now.getTime();
+  const stamp = toLocalISO(now);
+  const upcoming = (i: Item) => i.seriesId === seriesId && !i.completedAt && Date.parse(i.dateTime) > t;
+  const apply = <T extends { reminders?: number[] }>(x: T): T => (reminders ? { ...x, reminders } : withoutKey(x, "reminders"));
+  const same = (a: number[] | undefined) => JSON.stringify(a) === JSON.stringify(reminders);
+  batch(() => {
+    if (!s) {
+      setItems(items.value.map((i) => (upcoming(i) && !same(i.reminders) ? { ...apply(i), updatedAt: stamp } : i)));
+      return;
+    }
+    if (same(s.template.reminders)) return;
+    // Occurrences follow the series. Touching them keeps a reminder whose time has passed from going off late.
+    setItems(items.value.map((i) => (upcoming(i) ? { ...withoutKey(i, "reminders"), updatedAt: stamp } : i)));
+    setSeries(series.value.map((x) => (x.id === seriesId ? { ...x, template: apply(x.template) } : x)));
+  });
+}
+
+/** Completes an item marked done from a reminder (the notification was the confirmation, so no toast). */
+export function completeFromReminder(id: string, at: Date) {
+  const result = ops.complete(items.value, id, at);
+  if (!result) return;
+  batch(() => {
+    setItems(result.next);
+    setCompletions([...completions.value, result.record]);
+  });
+}
+
 /** Adds an item made on the calendar (quick create). */
 export function addFromCalendar(fields: { title: string; type: Item["type"]; start: Date; end: Date | null; categoryId: string | null }, now = new Date()): Item {
   const item = ops.newItem(now);
@@ -254,6 +288,7 @@ function templateOf(item: Item, title: string): Series["template"] {
   const duration = durationOf(item);
   if (duration) t.duration = duration;
   if (item.location) t.location = item.location;
+  if (item.reminders) t.reminders = item.reminders;
   return t;
 }
 
@@ -279,7 +314,9 @@ export function makeRepeating(item: Item, rule: RepeatRule, end: RepeatEnd, titl
   if (item.allDay) s.allDay = true;
   if (item.categoryId) s.categoryId = item.categoryId;
   setSeries([...series.value, s]);
-  return { ...item, seriesId: s.id };
+  // The series holds the reminders now, so a later change to them reaches every occurrence.
+  const { reminders: _, ...first } = item;
+  return { ...first, seriesId: s.id };
 }
 
 /**
@@ -306,13 +343,15 @@ export function changeSeriesRule(
   batch(() => {
     const kept = items.value.filter((i) => !isUpcomingSibling(i));
     if (rule) {
+      const template = templateOf(anchor, title?.template ?? anchor.title);
+      if (s.template.reminders) template.reminders = s.template.reminders;
       const restarted: Series = {
         ...s,
         epoch: s.epoch + 1,
         start: anchor.dateTime,
         rule,
         end,
-        template: templateOf(anchor, title?.template ?? anchor.title),
+        template,
         nextIndex: 1,
       };
       const { numberFrom } = titleFields({ template: restarted.template.title, numberFrom: title?.numberFrom });
@@ -328,7 +367,8 @@ export function changeSeriesRule(
         kept.map((i) => {
           if (i.id !== anchor.id) return i;
           const { seriesId: _, ...single } = anchor;
-          return single;
+          // It keeps the series' reminders.
+          return s.template.reminders && !single.reminders ? { ...single, reminders: s.template.reminders } : single;
         }),
       );
       setSeries(series.value.filter((x) => x.id !== seriesId));

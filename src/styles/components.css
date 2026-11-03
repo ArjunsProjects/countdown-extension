@@ -1578,6 +1578,34 @@ button.tile:active {
   right: var(--space-1);
 }
 
+/* "Remind me": one select, and a second once the first is set. */
+.reminder-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-0-5);
+}
+
+.reminder-field__selects {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.reminder-field__selects .select-field {
+  flex: 1 1 150px;
+  min-width: 0;
+}
+
+/* "Reminders are off on this computer. Turn on", as one line of text. */
+.reminder-field__turn-on {
+  height: auto;
+  margin-left: var(--space-0-5);
+  padding: 0;
+  font-size: inherit;
+  line-height: inherit;
+  vertical-align: baseline;
+}
+
 .select-field--compact select {
   padding-left: var(--space-1);
 }
@@ -2877,6 +2905,18 @@ body.is-dragging * {
   grid-column: 1 / -1;
   justify-self: start;
   margin: var(--space-0-5) 0 0 calc(var(--space-1) * -1);
+}
+
+/* Default reminders, under the switch once reminders are on. */
+.appearance__reminders {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: var(--space-0-5);
+  margin-top: var(--space-1);
+}
+
+.appearance__reminders .reminder-field + .field-label {
+  margin-top: var(--space-0-5);
 }
 
 .appearance__switch-label {

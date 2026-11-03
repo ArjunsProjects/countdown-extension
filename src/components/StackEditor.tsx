@@ -10,7 +10,7 @@ import { hasNumberToken, renderTitle } from "../lib/numbering";
 import type { TimeParts } from "../lib/parse";
 import { occurrenceIndex } from "../lib/recurrence";
 import { MAX_LOCATION } from "../lib/events";
-import { assignCategory, changeSeriesRule, removeItems, removeSeries, saveSeries, series, setSeriesEnd, setSeriesLocation, setSeriesTime } from "../state/store";
+import { assignCategory, changeSeriesRule, prefs, removeItems, removeSeries, saveSeries, series, setSeriesEnd, setSeriesLocation, setSeriesReminders, setSeriesTime } from "../state/store";
 import { completing, editing, focusTile, startCompletion } from "../state/ui";
 import { CategoryField } from "./CategoryField";
 import { Checkbox } from "./Checkbox";
@@ -19,6 +19,7 @@ import { SelectCell } from "./SelectCell";
 import { Icon } from "./Icon";
 import { occurrenceCount, repeatOf } from "./ItemEditor";
 import { NO_REPEAT, RepeatField, ruleOf, sameRepeat, type RepeatValue } from "./RepeatField";
+import { ReminderField } from "./ReminderField";
 import { TimeField } from "./TimeField";
 import { TitleNumbering } from "./TitleNumbering";
 import { TypeToggle } from "./TypeToggle";
@@ -76,8 +77,11 @@ export function StackEditorRow({ seriesId, items, unit, now }: Props) {
   const [endTouched, setEndTouched] = useState(false);
   const [place, setPlace] = useState(head.location ?? owner?.template.location ?? "");
   const [placeTouched, setPlaceTouched] = useState(false);
-  const latestTime = useRef({ time, timeTouched, endTime, endTouched, place, placeTouched });
-  latestTime.current = { time, timeTouched, endTime, endTouched, place, placeTouched };
+  // Reminders too: the series', or (a stack with no stored rule) the next occurrence's.
+  const [reminders, setReminders] = useState(() => (owner ? owner.template.reminders : head.reminders));
+  const [remindersTouched, setRemindersTouched] = useState(false);
+  const latestTime = useRef({ time, timeTouched, endTime, endTouched, place, placeTouched, reminders, remindersTouched });
+  latestTime.current = { time, timeTouched, endTime, endTouched, place, placeTouched, reminders, remindersTouched };
   const mixedTimes = new Set(items.map((i) => JSON.stringify(timeOf(i)))).size > 1;
 
   /** An occurrence's title as it will read with the title being edited. */
@@ -127,6 +131,7 @@ export function StackEditorRow({ seriesId, items, unit, now }: Props) {
     if (tm.timeTouched) setSeriesTime(seriesId, tm.time);
     if (tm.endTouched && tm.time) setSeriesEnd(seriesId, tm.endTime);
     if (tm.placeTouched) setSeriesLocation(seriesId, tm.place);
+    if (tm.remindersTouched) setSeriesReminders(seriesId, tm.reminders);
     if ((head.categoryId ?? null) !== latestCategory.current) {
       assignCategory({ kind: "series", id: seriesId }, latestCategory.current, true);
     }
@@ -236,6 +241,17 @@ export function StackEditorRow({ seriesId, items, unit, now }: Props) {
             }}
           />
         </div>
+        <ReminderField
+          value={reminders}
+          onChange={(v) => {
+            setReminders(v);
+            setRemindersTouched(true);
+          }}
+          item={{ type, allDay: time === null }}
+          fallback={prefs.value.reminders[type]}
+          label="Remind me, for every occurrence"
+          offerTurnOn
+        />
         {initialRepeat !== NO_REPEAT && (
           <RepeatField date={partsOf(head.dateTime)} value={repeat} onChange={setRepeat} />
         )}

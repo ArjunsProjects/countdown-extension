@@ -31,6 +31,11 @@ export interface Item {
   categoryId?: string;
   /** Set when the user marks the item done; completed items leave the list. */
   completedAt?: string;
+  /**
+   * Minutes before the item to remind (whole days for all-day items); empty
+   * for none. Absent: its series' reminders, or the defaults for its type.
+   */
+  reminders?: number[];
 }
 
 /** Written when an item is completed. Kept separately so stats survive item removal. */

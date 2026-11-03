@@ -1,11 +1,13 @@
 import { useEffect, useId, useRef, useState } from "preact/hooks";
 import { PALETTES, paletteById, type Palette, type PaletteId } from "../lib/palettes";
 import type { Theme } from "../lib/storage";
+import { remindersDenied, remindersOn, setRemindersOn } from "../state/reminders";
 import { prefs, setPrefs } from "../state/store";
 import { backupAt, restoreBackup, setSyncEnabled, syncEnabled, syncStatus, syncSupported } from "../state/sync";
 import { setAppearance, shownAppearance, systemDark, THEME_LABEL } from "../state/theme";
 import { Icon } from "./Icon";
 import { Popover } from "./Popover";
+import { ReminderField } from "./ReminderField";
 
 const THEMES: Theme[] = ["system", "light", "dark"];
 
@@ -30,6 +32,13 @@ function syncHint(): string {
   }
 }
 
+/** Whether reminders are on, in a line. */
+function reminderHint(): string {
+  if (remindersOn.value) return "Before deadlines and events, on this computer while Chrome is open. Any item can set its own in its editor.";
+  if (remindersDenied.value) return "Chrome didn't allow notifications. Switch this on to ask again.";
+  return "A notification before deadlines and events. Chrome asks first.";
+}
+
 /**
  * A palette's swatch in the current scheme: its gradient with a check in the
  * colour its buttons use for text. Clear is a solid surface ringed in its accent.
@@ -50,8 +59,9 @@ function swatchStyle(p: Palette): Record<string, string> {
 
 /**
  * The header's Appearance button and its menu: light/dark mode, colour
- * theme, and whether the toolbar icon shows the time left. New settings go
- * here too; when it outgrows a popover it becomes a bottom sheet.
+ * theme, whether the toolbar icon shows the time left, reminders and sync.
+ * New settings go here too; when it outgrows a popover it becomes a bottom
+ * sheet.
  */
 export function AppearanceMenu() {
   const [open, setOpen] = useState(false);
@@ -60,7 +70,7 @@ export function AppearanceMenu() {
   const id = useId();
   const reducedTransparency = matchMedia("(prefers-reduced-transparency: reduce)").matches;
   const { theme, palette } = shownAppearance.value;
-  const { liveIcon } = prefs.value;
+  const { liveIcon, reminders } = prefs.value;
 
   const close = (returnFocus: boolean) => {
     setOpen(false);
@@ -170,6 +180,47 @@ export function AppearanceMenu() {
                 ? "The icon's sweep shrinks as your next item gets closer, with a short badge like 3d."
                 : "The icon stays still, with no badge."}
             </p>
+          </div>
+
+          <div class="appearance__group appearance__switch-row">
+            <label class="appearance__switch-label" for={`${id}-remind`}>
+              Reminders
+            </label>
+            {/* Switching on asks Chrome for the notifications permission, so it runs straight from the click. */}
+            <input
+              id={`${id}-remind`}
+              type="checkbox"
+              role="switch"
+              class="switch"
+              aria-describedby={`${id}-remind-hint`}
+              checked={remindersOn.value}
+              onChange={(e) => setRemindersOn(e.currentTarget.checked)}
+            />
+            <p id={`${id}-remind-hint`} class="field-hint" aria-live="polite">
+              {reminderHint()}
+            </p>
+            {remindersOn.value && (
+              <div class="appearance__reminders">
+                <span class="field-label" aria-hidden="true">
+                  Deadlines
+                </span>
+                <ReminderField
+                  value={reminders.due}
+                  onChange={(v) => setPrefs({ reminders: { ...reminders, due: v ?? [] } })}
+                  item={{ type: "due" }}
+                  label="Remind me before deadlines"
+                />
+                <span class="field-label" aria-hidden="true">
+                  Events
+                </span>
+                <ReminderField
+                  value={reminders.starts}
+                  onChange={(v) => setPrefs({ reminders: { ...reminders, starts: v ?? [] } })}
+                  item={{ type: "starts" }}
+                  label="Remind me before events"
+                />
+              </div>
+            )}
           </div>
 
           <div class="appearance__group appearance__switch-row">

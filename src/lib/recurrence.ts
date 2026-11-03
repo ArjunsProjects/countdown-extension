@@ -47,6 +47,8 @@ export interface Series {
     /** Events: minutes from each occurrence's start to its end (whole days for all-day series). */
     duration?: number;
     location?: string;
+    /** Reminders for every occurrence (see Item.reminders). Absent: the defaults. */
+    reminders?: number[];
   };
   /** Index of the next occurrence to generate. */
   nextIndex: number;
